@@ -1,24 +1,24 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-require('dotenv').config();
+import cors from 'cors'
+import express from 'express'
+import authRoutes from './routes/authRoutes.js'
+import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js'
 
-const connectDB = require('./config/db');
+export function createApp() {
+  const app = express()
+  const origin = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
+  app.use(
+    cors({
+      origin,
+      credentials: true,
+    }),
+  )
+  app.use(express.json())
 
-const app = express();
+  app.get('/health', (req, res) => res.json({ ok: true }))
 
-// Connect DB
-connectDB();
+  app.use('/api/auth', authRoutes)
 
-// Middleware Dasar
-app.use(helmet());
-app.use(cors());
-app.use(morgan('dev'));
-app.use(express.json());
-
-// Health check (untuk testing awal)
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Express running on port ${PORT}`));
+  app.use(notFoundHandler)
+  app.use(errorHandler)
+  return app
+}
