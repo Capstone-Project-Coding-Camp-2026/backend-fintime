@@ -109,3 +109,58 @@ router.post('/forecast', async (req, res) => {
         res.status(500).json({ error: 'TFJS Forecast Error', detail: err.message });
     }
 });
+
+// ==========================================
+// ENDPOINT WHAT-IF
+// ==========================================
+router.post('/whatif', async (req, res) => {
+    try {
+        const payload = req.body;
+        
+        // Hitung derived features
+        const paylater_monthly_payment = (payload.item_price / payload.paylater_tenor_months) * (1 + payload.paylater_interest_rate);
+        const paylater_monthly_burden = paylater_monthly_payment / (payload.monthly_cashflow || 1);
+        const estimated_income = payload.monthly_cashflow / Math.max(1 - payload.current_etr, 0.01);
+        const etr_after = (estimated_income * payload.current_etr + paylater_monthly_payment) / estimated_income;
+        const cashflow_after = payload.monthly_cashflow - paylater_monthly_payment;
+
+        const PAYLATER_MAP = { 'never': 0, 'occasional': 1, 'frequent': 2, 'problematic': 3 };
+
+        // Vector 10 fitur
+        const features = [
+            payload.current_etr,
+            payload.monthly_cashflow,
+            payload.pinjol_active ? 1 : 0,
+            PAYLATER_MAP[payload.paylater_usage_history] || 0,
+            payload.item_price,
+            payload.paylater_tenor_months,
+            payload.paylater_interest_rate,
+            paylater_monthly_burden,
+            etr_after,
+            cashflow_after
+        ];
+
+        const inputTensor = tf.tensor2d([features]);
+        const prediction = whatifModel.predict(inputTensor);
+        const proba = await prediction.array();
+        
+        const maxConfidence = Math.max(...proba[0]);
+        const labelIdx = proba[0].indexOf(maxConfidence);
+        const classes = ['just_buy', 'buy_careful', 'dont_buy'];
+
+        tf.dispose([inputTensor, prediction]);
+
+        res.json({
+            recommendation: classes[labelIdx],
+            paylater_monthly_burden: Number(paylater_monthly_burden.toFixed(4)),
+            etr_after_purchase: Number(etr_after.toFixed(4)),
+            cashflow_after_purchase: Number(cashflow_after.toFixed(2)),
+            confidence: Number(maxConfidence.toFixed(4))
+        });
+
+    } catch (err) {
+        res.status(500).json({ error: 'TFJS What-If Error', detail: err.message });
+    }
+});
+
+module.exports = router;
