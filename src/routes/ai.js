@@ -68,3 +68,44 @@ router.post('/classify', async (req, res) => {
     }
 });
 
+// ==========================================
+// ENDPOINT FORECAST
+// ==========================================
+router.post('/forecast', async (req, res) => {
+    try {
+        const { monthly_data } = req.body;
+        
+        // Ambil data bulan terakhir sebagai input awal
+        const lastData = monthly_data[monthly_data.length - 1];
+        let currentFeatures = [
+            lastData.monthly_income, lastData.total_expense, lastData.expense_housing, 
+            lastData.expense_food, lastData.expense_transport, lastData.expense_entertainment, 
+            lastData.expense_health, lastData.expense_education, lastData.savings_capacity, 
+            lastData.current_total_balance, lastData.expense_to_income_ratio, 
+            lastData.savings_rate, monthly_data.length // bulan_index
+        ];
+
+        const predicted_expenses = [];
+
+        // Prediksi rolling 12 bulan
+        for (let i = 0; i < 12; i++) {
+            currentFeatures[12] = monthly_data.length + i + 1; // update bulan_index
+            
+            const inputTensor = tf.tensor2d([currentFeatures]);
+            const prediction = forecastModel.predict(inputTensor);
+            
+            const predValue = (await prediction.array())[0][0]; // Ambil angka regresi
+            predicted_expenses.append(predValue);
+
+            // Update fitur untuk iterasi berikutnya
+            currentFeatures[1] = predValue; // update total_expense
+            currentFeatures[8] = currentFeatures[0] - predValue; // update savings_capacity
+            
+            tf.dispose([inputTensor, prediction]);
+        }
+
+        res.json({ success: true, predicted_expenses });
+    } catch (err) {
+        res.status(500).json({ error: 'TFJS Forecast Error', detail: err.message });
+    }
+});
