@@ -17,6 +17,7 @@
     "fintime": "file:..",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.9.3",
+    "nodemailer": "^6.10.1",
     "prisma": "^6.19.3"
   }
 }
