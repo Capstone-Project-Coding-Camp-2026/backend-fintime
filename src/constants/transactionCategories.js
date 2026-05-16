@@ -1,0 +1,15 @@
+export const TRANSACTION_CATEGORIES = [
+  'perumahan',
+  'makanan',
+  'transport',
+  'hiburan',
+  'kesehatan',
+  'pendidikan',
+  'belanja',
+  'tagihan',
+  'gaji',
+  'investasi',
+  'freelance',
+  'hadiah',
+  'lainnya',
+]

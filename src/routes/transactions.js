@@ -4,10 +4,44 @@ import prisma from '../lib/prisma.js'
 
 const router = express.Router()
 
-router.get('/:userId', authMiddleware, async (req, res) => {
+router.get('/:userId/unlabelled', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params
-    const { page = 1, limit = 20, startDate, endDate, category, type } = req.query
+
+    const transactions = await prisma.transaction.findMany({
+      where: {
+        userId,
+        OR: [
+          { categoryLabel: null },
+          { categoryLabel: "lainnya" },
+          { isLabelled: false },
+        ],
+      },
+      orderBy: { dateTime: "desc" },
+    })
+
+    res.json({
+      success: true,
+      data: transactions,
+      count: transactions.length,
+    })
+  } catch (error) {
+    console.error("Error getting unlabelled transactions:", error)
+    res.status(500).json({ success: false, message: "Server error" })
+  }
+})
+
+router.get("/:userId", authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.params
+    const {
+      page = 1,
+      limit = 20,
+      startDate,
+      endDate,
+      category,
+      type,
+    } = req.query
 
     const where = { userId }
 
@@ -38,36 +72,8 @@ router.get('/:userId', authMiddleware, async (req, res) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / limit)
-      }
-    })
-  } catch (error) {
-    console.error('Error getting transactions:', error)
-    res.status(500).json({ success: false, message: 'Server error' })
-  }
-})
-
-// Get unlabelled transactions
-router.get('/:userId/unlabelled', authMiddleware, async (req, res) => {
-  try {
-    const { userId } = req.params
-
-    const transactions = await prisma.transaction.findMany({
-      where: {
-        userId,
-        OR: [
-          { categoryLabel: null },
-          { categoryLabel: 'lainnya' },
-          { isLabelled: false }
-        ]
+        pages: Math.ceil(total / limit),
       },
-      orderBy: { dateTime: 'desc' }
-    })
-
-    res.json({
-      success: true,
-      data: transactions,
-      count: transactions.length
     })
   } catch (error) {
     console.error('Error getting unlabelled transactions:', error)

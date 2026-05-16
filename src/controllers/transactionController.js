@@ -78,13 +78,7 @@ export const relabelTransaction = async (req, res) => {
     const { transactionId } = req.params
     const { categoryLabel } = req.body
 
-    const validCategories = [
-      'perumahan', 'makanan', 'transport', 'hiburan', 'kesehatan',
-      'pendidikan', 'belanja', 'tagihan', 'gaji', 'investasi',
-      'freelance', 'hadiah', 'lainnya'
-    ]
-
-    if (!validCategories.includes(categoryLabel)) {
+    if (!TRANSACTION_CATEGORIES.includes(categoryLabel)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid category label'
@@ -114,15 +108,10 @@ export const relabelTransaction = async (req, res) => {
 // Batch relabel transactions
 export const relabelBatch = async (req, res) => {
   try {
-    const { transactionIds, categoryLabel } = req.body
+    const { transactionIds } = req.params
+    const { categoryLabel } = req.body
 
-    const validCategories = [
-      'perumahan', 'makanan', 'transport', 'hiburan', 'kesehatan',
-      'pendidikan', 'belanja', 'tagihan', 'gaji', 'investasi',
-      'freelance', 'hadiah', 'lainnya'
-    ]
-
-    if (!validCategories.includes(categoryLabel)) {
+    if (!TRANSACTION_CATEGORIES.includes(categoryLabel)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid category label'
