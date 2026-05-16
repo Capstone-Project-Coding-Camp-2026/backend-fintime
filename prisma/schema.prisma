@@ -19,7 +19,6 @@ model User {
 
   gender           String?              // male / female
   birthDate        DateTime?
-  occupation       String?
   phone            String?
   monthlyIncome    Float?
   retirementAge    Int?
