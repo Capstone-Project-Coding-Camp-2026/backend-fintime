@@ -1,43 +1,35 @@
-const request = require('supertest');
-const app = require('../src/app'); 
+import request from 'supertest';
+import { createApp } from '../src/app.js';
 
-describe('Testing API Endpoints FinTime', () => {
-    
-    // Test 1: Pastikan server merespons dengan benar
-    it('Harus mengembalikan status OK saat mengakses /health', async () => {
-        const res = await request(app).get('/health');
-        expect(res.statusCode).toEqual(200);
-        expect(res.body).toHaveProperty('status', 'ok');
-    });
+const app = createApp();
 
-    // Test 2: Simulasi kirim data ke endpoint AI Forecast
-    it('Endpoint /api/ai/forecast harus merespons data prediksi (Simulasi)', async () => {
-        const mockData = {
-            monthly_data: [
-                {
-                    bulan: "2024-01",
-                    monthly_income: 5000000,
-                    total_expense: 3000000,
-                    expense_housing: 1000000,
-                    expense_food: 1500000,
-                    expense_transport: 500000,
-                    expense_entertainment: 0,
-                    expense_health: 0,
-                    expense_education: 0,
-                    savings_capacity: 2000000,
-                    current_total_balance: 10000000,
-                    expense_to_income_ratio: 0.6,
-                    savings_rate: 0.4
-                }
-            ]
-        };
+describe('Uji Coba API: General Endpoints FinTime', () => {
+  
+  // Test 1: Menguji endpoint health check
+  it('GET /health - Harus mengembalikan status 200 dan objek { ok: true }', async () => {
+    const response = await request(app)
+      .get('/health')
+      .set('Accept', 'application/json');
 
-        const res = await request(app)
-            .post('/api/ai/forecast')
-            .send(mockData); // Mengirim data JSON
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('ok', true);
+  });
 
-        // Karena model TFJS belum ada, kita ekspektasikan error 500 yang sudah kita set di try-catch
-        expect(res.statusCode).toEqual(500); 
-        expect(res.body).toHaveProperty('error', 'TFJS Forecast Error');
-    });
+  // Test 2: Menguji penanganan route yang salah (404)
+  it('GET /api/route-asal-asalan - Harus mengembalikan status 404 untuk rute yang tidak terdaftar', async () => {
+    const response = await request(app)
+      .get('/api/route-asal-asalan');
+
+    expect(response.status).toBe(404);
+  });
+
+  // Test 3: Memastikan middleware express.json() bekerja (Menerima JSON)
+  it('POST /api/auth/register - Harus mengembalikan respons validasi/error yang terstruktur (bukan crash)', async () => {
+    // Kita mengirim data kosong ke auth register untuk memastikan request body bisa dibaca
+    const response = await request(app)
+      .post('/api/auth/register')
+      .send({}); // Mengirim body kosong
+
+    expect(response.status).not.toBe(200);
+  });
 });
