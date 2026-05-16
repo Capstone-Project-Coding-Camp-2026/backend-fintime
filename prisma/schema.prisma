@@ -1,7 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+// FinTime Prisma Schema
+// PostgreSQL Database
 
 generator client {
   provider = "prisma-client-js"
@@ -12,21 +10,164 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+
 model User {
   id               String   @id @default(cuid())
   fullName         String
   email            String   @unique
   password         String
 
-  gender           String?
+  gender           String?              // male / female
   birthDate        DateTime?
   occupation       String?
   phone            String?
-  monthlyIncome    String?
-  linkedAccounts   Json?
+  monthlyIncome    Float?
   retirementAge    Int?
-  avatarCondition  String   @default("normal")
+  avatarCondition  String   @default("normal")  // good / normal / bad
+
+  // Job type: permanent / freelance / gig / civil_servant / entrepreneur / not_working
+  jobType          String?
+
+  // Auto-label rules: [{match, category, include_expense}]
+  labelRules        Json[]   @default([])
 
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+
+  // Relations
+  transactions     Transaction[]
+  linkedAccounts  LinkedAccount[]
+  aggregations     Aggregation[]
+  avatarState      AvatarState?
 }
+
+model Transaction {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  dateTime        DateTime
+  description     String              // Raw dari bank, input NLP
+  amount          Float
+  categoryLabel   String?            // Nullable, 13 kemungkinan nilai
+  confidence      Float?             // Confidence score dari NLP (0-1)
+  transactionType String              // debit / credit / transfer
+  paymentMethod   String?            // tunai / debit / paylater / ewallet / credit
+  source          String?            // Asal bank/e-wallet (bca, gopay, dll)
+  isLabelled      Boolean  @default(false)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Index untuk query bulanan
+  @@index([userId, dateTime])
+}
+
+
+model LinkedAccount {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type          String              // bank / ewallet
+  provider      String              // bca, mandiri, gopay, ovo, dll
+  name          String              // Nama akun
+  accountNumber String?             // Nomor rekening / telepon
+  balance       Float   @default(0)
+  currency      String  @default("IDR")
+  isActive      Boolean @default(true)
+  lastSynced    DateTime?
+  apiToken      String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId, provider])
+}
+
+
+model Aggregation {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  monthYear   String               // Format YYYY-MM
+
+  totalIncome Float   @default(0)
+  totalExpense Float   @default(0)
+
+  // Expense breakdown
+  expenseHousing    Float @default(0)
+  expenseFood       Float @default(0)
+  expenseTransport  Float @default(0)
+  expenseEntertainment Float @default(0)
+  expenseHealth     Float @default(0)
+  expenseEducation   Float @default(0)
+  expenseShopping    Float @default(0)
+  expenseBills       Float @default(0)
+  expenseOther       Float @default(0)
+
+  // Calculated values
+  savingsCapacity       Float @default(0)
+  currentTotalBalance    Float @default(0)
+  expenseToIncomeRatio   Float @default(0)
+  savingsRate            Float @default(0)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, monthYear])
+  @@index([userId])
+}
+
+model AvatarState {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  condition            String               // good / normal / bad
+  projectedWealth      Float   @default(0)
+  pensionSurvivalYears Float   @default(0)
+
+  // Rekomendasi investasi
+  recommendedAssetClass String?
+
+  // Prediksi pengeluaran 12 bulan ke depan (JSON array)
+  predictedExpenseTrend Json[]  @default([])
+
+  lastCalculated DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+
+model Learning {
+  id              String   @id @default(cuid())
+  title           String
+  content         String
+  targetCondition String               // good / normal / bad / all
+  category        String               // investasi / budgeting / utang / tabungan / pensiun
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================================
+// ENUM TYPES (comments for reference)
+// ============================================================
+
+// categoryLabel options: perumahan, makanan, transport, hiburan, kesehatan,
+//                       pendidikan, belanja, tagihan, gaji, investasi,
+//                       freelance, hadiah, lainnya
+
+// transactionType: debit, credit, transfer
+
+// paymentMethod: tunai, debit, paylater, ewallet, credit
+
+// jobType: permanent, freelance, gig, civil_servant, entrepreneur, not_working
+
+// avatar condition: good, normal, bad
+
+// learning category: investasi, budgeting, utang, tabungan, pensiun
+
+// targetCondition: good, normal, bad, all
