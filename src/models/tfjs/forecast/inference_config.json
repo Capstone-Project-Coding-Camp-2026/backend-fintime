@@ -1,0 +1,39 @@
+{
+  "feature_cols": [
+    "lag1_total_expense",
+    "lag2_total_expense",
+    "lag3_total_expense",
+    "roll3_mean_expense",
+    "roll6_mean_expense",
+    "roll3_std_expense",
+    "lag1_monthly_income",
+    "lag1_savings_rate",
+    "lag1_expense_growth",
+    "bulan_sin",
+    "bulan_cos",
+    "persona_id"
+  ],
+  "target_col": "total_expense",
+  "y_scale": 1000000.0,
+  "output_unit": "IDR (multiply model output by y_scale)",
+  "metrics": {
+    "mae": 302239.7426904762,
+    "rmse": 460099.34594038635,
+    "r2": 0.9899044487780125,
+    "mape": 5.887827561184529
+  },
+  "lag_features": {
+    "lags": [
+      1,
+      2,
+      3
+    ],
+    "rolling_mean": [
+      3,
+      6
+    ],
+    "rolling_std": [
+      3
+    ]
+  }
+}
