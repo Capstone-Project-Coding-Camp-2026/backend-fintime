@@ -4,6 +4,48 @@ import jwt from 'jsonwebtoken'
 import prisma from '../lib/prisma.js'
 import { sendResetPasswordEmail, generateResetToken, verifyResetToken } from '../services/emailService.js'
 
+function mapOccupationToJobType(occupation) {
+  if (!occupation) return 'permanent'
+  switch (occupation) {
+    case 'employee':
+      return 'permanent'
+    case 'freelancer':
+      return 'freelance'
+    case 'government':
+      return 'civil_servant'
+    case 'entrepreneur':
+      return 'entrepreneur'
+    case 'student':
+    case 'retired':
+    case 'not_working':
+      return 'not_working'
+    default:
+      if (['permanent', 'freelance', 'gig', 'civil_servant', 'entrepreneur', 'not_working'].includes(occupation)) {
+        return occupation
+      }
+      return 'permanent'
+  }
+}
+
+function mapJobTypeToOccupation(jobType) {
+  if (!jobType) return 'employee'
+  switch (jobType) {
+    case 'permanent':
+      return 'employee'
+    case 'freelance':
+    case 'gig':
+      return 'freelancer'
+    case 'civil_servant':
+      return 'government'
+    case 'entrepreneur':
+      return 'entrepreneur'
+    case 'not_working':
+      return 'retired'
+    default:
+      return jobType
+  }
+}
+
 function signToken(userId) {
   return jwt.sign(
     { sub: userId },
@@ -21,6 +63,7 @@ export async function register(req, res, next) {
       gender,
       birthDate,
       jobType,
+      occupation,
       email,
       phone,
       password,
@@ -82,7 +125,7 @@ export async function register(req, res, next) {
         fullName,
         gender,
         birthDate: parsedBirthDate,
-        jobType,
+        jobType: mapOccupationToJobType(jobType || occupation),
         email: email.toLowerCase(),
         phone,
         password: hashed,
@@ -117,6 +160,7 @@ export async function register(req, res, next) {
 
     // remove password
     const { password: _, ...safeUser } = userWithLinked
+    safeUser.occupation = mapJobTypeToOccupation(safeUser.jobType)
 
     res.status(201).json({
       message: 'Register success',
@@ -169,6 +213,7 @@ export async function login(req, res, next) {
 
     // hide password
     const { password: _, ...safeUser } = user
+    safeUser.occupation = mapJobTypeToOccupation(safeUser.jobType)
 
     res.json({
       message: 'Login success',
@@ -196,6 +241,7 @@ export async function profile(req, res, next) {
     }
 
     const { password, ...safeUser } = user
+    safeUser.occupation = mapJobTypeToOccupation(safeUser.jobType)
 
     res.json({
       user: safeUser,
@@ -337,6 +383,80 @@ export async function checkAvailability(req, res, next) {
     }
 
     res.json(result)
+  } catch (e) {
+    next(e)
+  }
+}
+
+export async function updateProfile(req, res, next) {
+  try {
+    const {
+      fullName,
+      gender,
+      birthDate,
+      jobType,
+      occupation,
+      phone,
+      monthlyIncome,
+      retirementAge,
+    } = req.body
+
+    const userId = req.userId
+
+    // build update data
+    const updateData = {}
+
+    if (fullName !== undefined) updateData.fullName = fullName
+    if (gender !== undefined) updateData.gender = gender
+    
+    if (birthDate !== undefined) {
+      let parsedBirthDate = null
+      if (birthDate && typeof birthDate === 'string' && birthDate.length === 10) {
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+        if (dateRegex.test(birthDate)) {
+          const dateObj = new Date(birthDate + 'T00:00:00.000Z')
+          if (!isNaN(dateObj.getTime()) && dateObj.getUTCFullYear() >= 1900 && dateObj.getUTCFullYear() <= 2010) {
+            parsedBirthDate = dateObj
+          }
+        }
+      } else if (birthDate) {
+        const dateObj = new Date(birthDate)
+        if (!isNaN(dateObj.getTime())) {
+          parsedBirthDate = dateObj
+        }
+      }
+      updateData.birthDate = parsedBirthDate
+    }
+
+    if (jobType !== undefined || occupation !== undefined) {
+      updateData.jobType = mapOccupationToJobType(jobType || occupation)
+    }
+
+    if (phone !== undefined) updateData.phone = phone
+
+    if (monthlyIncome !== undefined) {
+      const parsedMonthlyIncome = monthlyIncome
+        ? parseFloat(String(monthlyIncome).replace(/\D/g, ''))
+        : null
+      updateData.monthlyIncome = parsedMonthlyIncome
+    }
+
+    if (retirementAge !== undefined) {
+      updateData.retirementAge = retirementAge ? parseInt(retirementAge) : null
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+    })
+
+    const { password: _, ...safeUser } = updatedUser
+    safeUser.occupation = mapJobTypeToOccupation(safeUser.jobType)
+
+    res.json({
+      message: 'Profile updated successfully',
+      user: safeUser,
+    })
   } catch (e) {
     next(e)
   }

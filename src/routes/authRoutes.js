@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { login, profile, register, forgotPassword, resetPassword, checkAvailability } from '../controllers/authController.js'
+import { login, profile, updateProfile, register, forgotPassword, resetPassword, checkAvailability } from '../controllers/authController.js'
 import { authMiddleware } from '../middlewares/auth.js'
 
 const r = Router()
@@ -9,5 +9,6 @@ r.post('/forgot-password', forgotPassword)
 r.post('/reset-password', resetPassword)
 r.post('/check-availability', checkAvailability)
 r.get('/profile', authMiddleware, profile)
+r.put('/profile', authMiddleware, updateProfile)
 
 export default r
