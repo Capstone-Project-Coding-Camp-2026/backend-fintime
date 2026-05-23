@@ -4,7 +4,7 @@ import authRoutes from './routes/authRoutes.js'
 import transactionRoutes from './routes/transactions.js'
 import linkedAccountRoutes from './routes/linkedAccounts.js'
 import aiRoutes from './routes/aiRoutes.js'
-import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js'
+import { errorHandler, notFoundHandler } from './middleware/errorHandler.js'
 
 export function createApp() {
   const app = express()

@@ -1,5 +1,5 @@
 import express from 'express'
-import authMiddleware from '../middleware/auth.js'
+import { authMiddleware } from '../middleware/auth.js'
 import prisma from '../lib/prisma.js'
 
 const router = express.Router()
@@ -70,18 +70,33 @@ router.get('/:userId/summary', authMiddleware, async (req, res) => {
 // Link a new account
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { userId, type, provider, name, accountNumber, balance } = req.body
+
+    // USER DARI JWT
+    const userId = req.user.sub;
+
+    // DATA DARI BODY
+    const {
+      type,
+      provider,
+      name,
+      accountNumber,
+      balance
+    } = req.body;
 
     // Check if already linked
     const existing = await prisma.linkedAccount.findFirst({
-      where: { userId, provider, isActive: true }
-    })
+      where: {
+        userId,
+        provider,
+        isActive: true
+      }
+    });
 
     if (existing) {
       return res.status(400).json({
         success: false,
         message: 'Account already linked'
-      })
+      });
     }
 
     const linkedAccount = await prisma.linkedAccount.create({
@@ -93,18 +108,23 @@ router.post('/', authMiddleware, async (req, res) => {
         accountNumber,
         balance: balance || 0
       }
-    })
+    });
 
     res.status(201).json({
       success: true,
       message: 'Account linked successfully',
       data: linkedAccount
-    })
+    });
+
   } catch (error) {
-    console.error('Error linking account:', error)
-    res.status(500).json({ success: false, message: 'Server error' })
+    console.error('Error linking account:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
   }
-})
+});
 
 // Update account balance
 router.put('/:accountId/balance', authMiddleware, async (req, res) => {

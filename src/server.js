@@ -13,7 +13,6 @@ if (!process.env.JWT_SECRET) {
 
 async function main() {
   const app = createApp();
-
   app.listen(PORT, () => {
     console.log(`FinTime API listening on http://localhost:${PORT}`);
   });

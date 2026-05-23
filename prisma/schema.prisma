@@ -22,13 +22,12 @@ model User {
   phone            String?
   monthlyIncome    Float?
   retirementAge    Int?
-  avatarCondition  String   @default("normal")  // good / normal / bad
+  avatarCondition AvatarCondition @default(normal)
 
-  // Job type: permanent / freelance / gig / civil_servant / entrepreneur / not_working
-  jobType          String?
+  jobType JobType?
 
   // Auto-label rules: [{match, category, include_expense}]
-  labelRules        Json[]   @default([])
+  labelRules        Json   @default("[]")
 
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -42,26 +41,38 @@ model User {
 
 model Transaction {
   id              String   @id @default(cuid())
+
   userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   dateTime        DateTime
-  description     String              // Raw dari bank, input NLP
+
+  description     String
+
   amount          Float
-  categoryLabel   String?            // Nullable, 13 kemungkinan nilai
-  confidence      Float?             // Confidence score dari NLP (0-1)
-  transactionType String              // debit / credit / transfer
-  paymentMethod   String?            // tunai / debit / paylater / ewallet / credit
-  source          String?            // Asal bank/e-wallet (bca, gopay, dll)
-  isLabelled      Boolean  @default(false)
+
+  categoryLabel   String?
+
+  confidence      Float?
+
+  transactionType TransactionType
+
+  paymentMethod   PaymentMethod?
+
+  source          AccountSource?
+
+  isLabelled      Boolean @default(false)
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  // Index untuk query bulanan
+  deletedAt       DateTime?
+
+  @@index([userId])
+  @@index([dateTime])
+  @@index([categoryLabel])
   @@index([userId, dateTime])
 }
-
 
 model LinkedAccount {
   id            String   @id @default(cuid())
@@ -69,7 +80,7 @@ model LinkedAccount {
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   type          String              // bank / ewallet
-  provider      String              // bca, mandiri, gopay, ovo, dll
+  provider  AccountSource              // bca, mandiri, gopay, ovo, dll
   name          String              // Nama akun
   accountNumber String?             // Nomor rekening / telepon
   balance       Float   @default(0)
@@ -82,6 +93,7 @@ model LinkedAccount {
   updatedAt     DateTime @updatedAt
 
   @@index([userId, provider])
+  @@unique([userId, provider, accountNumber])
 }
 
 
@@ -97,13 +109,14 @@ model Aggregation {
 
   // Expense breakdown
   expenseHousing    Float @default(0)
-  expenseFood       Float @default(0)
-  expenseTransport  Float @default(0)
+  expenseFoodDrink       Float @default(0)
+  expenseTransportation  Float @default(0)
   expenseEntertainment Float @default(0)
   expenseHealth     Float @default(0)
   expenseEducation   Float @default(0)
   expenseShopping    Float @default(0)
   expenseBills       Float @default(0)
+  expenseInvestment Float @default(0)
   expenseOther       Float @default(0)
 
   // Calculated values
@@ -111,7 +124,8 @@ model Aggregation {
   currentTotalBalance    Float @default(0)
   expenseToIncomeRatio   Float @default(0)
   savingsRate            Float @default(0)
-
+  transactionCount       Int @default(0)
+  
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -132,7 +146,7 @@ model AvatarState {
   recommendedAssetClass String?
 
   // Prediksi pengeluaran 12 bulan ke depan (JSON array)
-  predictedExpenseTrend Json[]  @default([])
+predictedExpenseTrend Json @default("[]")
 
   lastCalculated DateTime @default(now())
   createdAt      DateTime @default(now())
@@ -155,17 +169,67 @@ model Learning {
 // ENUM TYPES (comments for reference)
 // ============================================================
 
-// categoryLabel options: perumahan, makanan, transport, hiburan, kesehatan,
-//                       pendidikan, belanja, tagihan, gaji, investasi,
-//                       freelance, hadiah, lainnya
+// categoryLabel  {
+//perumahan
+//makanan_minuman
+//transportasi
+//hiburan
+//kesehatan
+//pendidikan
+//belanja
+//tagihan
+//investasi
+//gaji
+//freelance
+//hadiah
+//topup_ewallet
+//transfer_internal
+//lainnya
+//}
 
-// transactionType: debit, credit, transfer
+enum TransactionType {
+  debit
+  credit
+}
 
-// paymentMethod: tunai, debit, paylater, ewallet, credit
+enum PaymentMethod {
+  tunai
+  debit
+  paylater
+  ewallet
+  credit
+}
 
-// jobType: permanent, freelance, gig, civil_servant, entrepreneur, not_working
+enum AvatarCondition {
+  good
+  normal
+  bad
+}
 
-// avatar condition: good, normal, bad
+enum JobType {
+  permanent
+  freelance
+  gig
+  civil_servant
+  entrepreneur
+  not_working
+}
+
+enum AccountSource {
+  bca
+  mandiri
+  bri
+  bni
+  btn
+  cimb
+  permata
+  gopay
+  ovo
+  dana
+  shopeepay
+  linkaja
+  lainnya
+}
 
 // learning category: investasi, budgeting, utang, tabungan, pensiun
 
