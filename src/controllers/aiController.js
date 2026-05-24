@@ -6,6 +6,7 @@ import {
 } from "../services/aiApiService.js";
 
 import { generateForecast } from "../services/forecastService.js";
+import { runWhatIfAnalysis } from "../services/whatIfService.js";
 
 export async function healthCheck(req, res, next) {
   try {
@@ -31,8 +32,7 @@ export async function classify(req, res, next) {
       });
     }
 
-    const result =
-      await classifyTransactionAI(description);
+    const result = await classifyTransactionAI(description);
 
     res.json({
       success: true,
@@ -60,18 +60,15 @@ export async function forecast(req, res, next) {
   }
 }
 
-export async function whatIf(req, res, next) {
+export const whatIf = async (req, res, next) => {
   try {
-    const payload = req.body;
-
-    const result = await whatIfAI(payload);
+    const result = await runWhatIfAnalysis(req.body);
 
     res.json({
       success: true,
-      message: "What-if generated",
       data: result,
     });
-  } catch (e) {
-    next(e);
+  } catch (err) {
+    next(err);
   }
-}
+};
