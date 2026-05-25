@@ -4,6 +4,7 @@ import authRoutes from './routes/authRoutes.js'
 import transactionRoutes from './routes/transactions.js'
 import linkedAccountRoutes from './routes/linkedAccounts.js'
 import aiRoutes from './routes/aiRoutes.js'
+import mockRoutes from './routes/mockRoutes.js'
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js'
 
 export function createApp() {
@@ -24,6 +25,7 @@ export function createApp() {
   app.use('/api/auth', authRoutes)
   app.use('/api/transactions', transactionRoutes)
   app.use('/api/linked-accounts', linkedAccountRoutes)
+  app.use('/api/mock', mockRoutes)
 
   // Routes Model
   app.use('/api/ai', aiRoutes)
