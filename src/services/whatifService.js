@@ -13,6 +13,9 @@ export const runWhatIfAnalysis = async ({
     where: { id: userId },
   });
 
+  if (!user) {
+    throw new Error("User not found");
+  }
   const accounts = await prisma.linkedAccount.findMany({
     where: {
       userId,
@@ -39,5 +42,19 @@ export const runWhatIfAnalysis = async ({
     itemPrice,
   });
 
-  return await whatIfAI(aiPayload);
+  const aiResult = await whatIfAI(aiPayload);
+
+  const tenor = aiPayload.simulation.paylater_tenor_months;
+
+  const installment =
+    aiResult.financial_impact?.paylater_monthly_installment || 0;
+
+  return {
+    ...aiResult,
+
+    monthly_payment: installment,
+
+    total_payment:
+      tenor > 1 ? installment * tenor : aiPayload.simulation.item_price,
+  };
 };

@@ -1,12 +1,11 @@
 import {
   classifyTransactionAI,
   forecastAI,
-  whatIfAI,
   checkAIHealth,
 } from "../services/aiApiService.js";
 
 import { generateForecast } from "../services/forecastService.js";
-import { runWhatIfAnalysis } from "../services/whatIfService.js";
+import { runWhatIfAnalysis } from "../services/whatifService.js";
 
 export async function healthCheck(req, res, next) {
   try {

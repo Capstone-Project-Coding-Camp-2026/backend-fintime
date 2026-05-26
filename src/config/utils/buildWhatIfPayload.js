@@ -10,7 +10,7 @@ export const buildWhatIfPayload = ({
 }) => {
   return {
     user_profile: {
-      age: user.age || 22,
+      age: user.age,
       total_income: monthlyIncome,
       monthly_expenses: monthlyExpense,
       current_savings: totalBalance,
