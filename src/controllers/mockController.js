@@ -1,71 +1,82 @@
 // src/controllers/mockController.js
-
+import { importMockTransactions } from "../services/mockImportService.js";
+import { createMockTransactions } from "../config/utils/mockGenerator.js";
+import prisma from "../lib/prisma.js";
 export const simulateOtp = (req, res, next) => {
-    try {
-        const { email } = req.body;
-        
-        if (!email) {
-            return res.status(400).json({ 
-                status: 'error', 
-                message: 'Email wajib diisi untuk pengiriman OTP.' 
-            });
-        }
+  try {
+    const { email } = req.body;
 
-        res.status(200).json({
-            status: 'success',
-            message: `OTP berhasil dikirim ke ${email} (Simulated)`
-        });
-    } catch (error) {
-        next(error);
+    if (!email) {
+      return res.status(400).json({
+        status: "error",
+        message: "Email wajib diisi untuk pengiriman OTP.",
+      });
     }
+
+    res.status(200).json({
+      status: "success",
+      message: `OTP berhasil dikirim ke ${email} (Simulated)`,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const generateMockTransactions = (req, res, next) => {
-    try {
-        const { source_type = 'all' } = req.query;
-        const transactionCount = Math.floor(Math.random() * (500 - 300 + 1)) + 300;
-        
-        const endDate = new Date();
-        const startDate = new Date();
-        startDate.setMonth(endDate.getMonth() - 12); 
-        
-        const templates = [
-            { desc: 'DEBIT EDC MCDONALD SUDIRMAN JKT', type: 'debit', method: 'debit', src: 'BCA' },
-            { desc: 'PYMNT PLN TOKEN 403821', type: 'debit', method: 'debit', src: 'Mandiri' },
-            { desc: 'TRANSFER KE GOPAY 0812345678', type: 'transfer', method: 'debit', src: 'BCA' },
-            { desc: 'GOFOOD AYAM GEPREK BENSU', type: 'debit', method: 'ewallet', src: 'GoPay' },
-            { desc: 'NETFLIX SUBSCRIPTION', type: 'debit', method: 'ewallet', src: 'OVO' },
-            { desc: 'GAJI BULANAN', type: 'credit', method: 'transfer', src: 'BCA' }
-        ];
+  try {
+    const transactions = createMockTransactions();
 
-        let generatedTransactions = [];
+    res.status(200).json({
+      status: "success",
+      count: transactions.length,
+      data: transactions,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
-        for (let i = 0; i < transactionCount; i++) {
-            const template = templates[Math.floor(Math.random() * templates.length)];
-            const randomDate = new Date(startDate.getTime() + Math.random() * (endDate.getTime() - startDate.getTime()));
-            
-            let amount = Math.floor(Math.random() * 300000) + 15000;
-            if (template.desc.includes('GAJI')) amount = Math.floor(Math.random() * 5000000) + 5000000;
+export const importTransactions = async (req, res, next) => {
+  try {
+    const userId = req.user.sub;
 
-            generatedTransactions.push({
-                date_time: randomDate.toISOString(),
-                description: template.desc,
-                amount: amount,
-                category_label: null,
-                transaction_type: template.type,
-                payment_method: template.method,
-                source: template.src
-            });
-        }
+    // hapus lama
+    await prisma.transaction.deleteMany({
+      where: { userId },
+    });
 
-        generatedTransactions.sort((a, b) => new Date(a.date_time) - new Date(b.date_time));
+    await prisma.aggregation.deleteMany({
+      where: { userId },
+    });
 
-        res.status(200).json({
-            status: 'success',
-            count: generatedTransactions.length,
-            data: generatedTransactions
-        });
-    } catch (error) {
-        next(error); 
+    // generate mock
+    const transactions = createMockTransactions();
+
+    // simpan + NLP classify
+    const saved = await importMockTransactions(userId, transactions);
+
+    // aggregation bulanan
+    const uniqueMonths = [
+      ...new Set(
+        transactions.map((t) => {
+          const d = new Date(t.date_time);
+
+          return `${d.getFullYear()}-${d.getMonth() + 1}`;
+        }),
+      ),
+    ];
+
+    for (const monthKey of uniqueMonths) {
+      const [year, month] = monthKey.split("-");
+
+      await calculateMonthlyAggregation(userId, Number(year), Number(month));
     }
+
+    res.status(200).json({
+      success: true,
+      imported: saved.length,
+    });
+  } catch (err) {
+    next(err);
+  }
 };
