@@ -183,9 +183,12 @@ export async function register(req, res, next) {
     };
 
     res.status(201).json({
-      message: "Register success",
-      token,
-      user: safeUser,
+      success: true,
+      message: "Register successful",
+      data: {
+        ...responseUser,
+        token,
+      },
     });
   } catch (e) {
     next(e);
@@ -238,7 +241,7 @@ export async function login(req, res, next) {
       success: true,
       message: "Login successful",
       data: {
-        user: responseUser,
+        ...responseUser,
         token,
       },
     });
@@ -268,7 +271,9 @@ export async function profile(req, res, next) {
     };
 
     res.json({
-      user: safeUser,
+      success: true,
+      message: "Profile fetched successfully",
+      data: responseUser,
     });
   } catch (e) {
     next(e);
@@ -489,8 +494,9 @@ export async function updateProfile(req, res, next) {
     };
 
     res.json({
+      success: true,
       message: "Profile updated successfully",
-      user: safeUser,
+      data: responseUser,
     });
   } catch (e) {
     next(e);
