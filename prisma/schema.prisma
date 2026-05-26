@@ -37,6 +37,13 @@ model User {
   linkedAccounts  LinkedAccount[]
   aggregations     Aggregation[]
   avatarState      AvatarState?
+
+  // New relations for additional features
+  budgets          Budget[]
+  debts            Debt[]
+  goals            Goal[]
+  investments      Investment[]
+  recurringTransactions RecurringTransaction[]
 }
 
 model Transaction {
@@ -234,3 +241,205 @@ enum AccountSource {
 // learning category: investasi, budgeting, utang, tabungan, pensiun
 
 // targetCondition: good, normal, bad, all
+
+// ============================================================
+// NEW MODELS FOR ADDITIONAL FEATURES
+// ============================================================
+
+model Budget {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  category  String               // makan, transportasi, belanja, hiburan, kesehatan, dll
+  limit     Float
+  period    String   @default("monthly")  // daily, weekly, monthly, yearly
+
+  // Tracking spent amount (calculated from transactions)
+  spent     Float   @default(0)
+
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@unique([userId, category, period])
+}
+
+model Debt {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name            String               // Nama hutang
+  debtType        DebtType             // kpr, vehicle, pinjol, card, personal, other
+  lender          String?              // Nama pemberi pinjaman
+
+  totalAmount     Float                // Total pinjaman awal
+  remainingAmount Float                // Sisa hutang
+  interestRate    Float   @default(0) // Bunga per tahun (%)
+
+  tenorMonths     Int?                 // Tenor dalam bulan
+  monthlyPayment   Float?              // Cicilan per bulan
+
+  startDate       DateTime?
+  dueDate         DateTime?
+
+  notes           String?
+
+  isActive        Boolean @default(true)
+
+  // Relation
+  payments        DebtPayment[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model DebtPayment {
+  id        String   @id @default(cuid())
+  debtId    String
+  debt      Debt     @relation(fields: [debtId], references: [id], onDelete: Cascade)
+
+  amount    Float
+  paidAt    DateTime @default(now())
+  notes     String?
+
+  createdAt DateTime @default(now())
+
+  @@index([debtId])
+}
+
+model Goal {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String               // Nama target
+  category    GoalCategory         // emergency_fund, vacation, vehicle, gadget, education, dll
+
+  targetAmount Float               // Target jumlah
+  currentAmount Float @default(0)  // Jumlah saat ini
+
+  targetDate   DateTime?           // Target tanggal
+  description  String?
+
+  isCompleted  Boolean @default(false)
+  completedAt  DateTime?
+
+  isActive     Boolean @default(true)
+
+  // Relation
+  savings         GoalSavings[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model GoalSavings {
+  id        String   @id @default(cuid())
+  goalId    String
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  amount    Float
+  savedAt   DateTime @default(now())
+  notes     String?
+
+  createdAt DateTime @default(now())
+
+  @@index([goalId])
+}
+
+model Investment {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String               // Nama investasi
+  type        InvestmentType       // stock, mutual_fund, crypto, deposito, bonds, other
+
+  initialAmount Float               // Nilai awal saat beli
+  currentValue Float               // Nilai saat ini
+
+  purchaseDate DateTime?
+
+  notes       String?
+
+  isActive    Boolean @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model RecurringTransaction {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name      String               // Nama transaksi
+  type      TransactionType      // debit (expense) / credit (income)
+
+  amount    Float
+  category  String?              // Kategori
+
+  frequency Frequency            // daily, weekly, monthly, yearly
+  startDate DateTime?
+  nextDate  DateTime?            // Tanggal下一次执行
+
+  notes     String?
+
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ============================================================
+// ENUM TYPES FOR NEW MODELS
+// ============================================================
+
+enum DebtType {
+  kpr
+  vehicle
+  pinjol
+  card
+  personal
+  other
+}
+
+enum GoalCategory {
+  emergency_fund
+  vacation
+  vehicle
+  gadget
+  education
+  wedding
+  home
+  investment
+  other
+}
+
+enum InvestmentType {
+  stock
+  mutual_fund
+  crypto
+  deposito
+  bonds
+  other
+}
+
+enum Frequency {
+  daily
+  weekly
+  monthly
+  yearly
+}

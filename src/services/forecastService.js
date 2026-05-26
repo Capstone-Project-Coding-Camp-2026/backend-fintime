@@ -28,11 +28,24 @@ export async function generateForecast(userId) {
     orderBy: { monthYear: "asc" },
   });
 
-  if (aggregations.length < 3) {
-    throw new Error("Minimum 3 months aggregation required");
-  }
-
   const monthlyIncome = user.monthlyIncome || 5000000;
+
+  // Handle case with insufficient data
+  if (aggregations.length < 3) {
+    const latestAgg = aggregations[aggregations.length - 1];
+    const balance = latestAgg?.currentTotalBalance || 0;
+    
+    return {
+      success: true,
+      message: "Insufficient data for full forecast (need 3 months)",
+      predictedExpenses: Array(12).fill(user.monthlyIncome * 0.7 || 3500000),
+      projectedWealth: balance + (monthlyIncome * 0.3 * 12 * 20),
+      pensionSurvivalYears: 5,
+      condition: "normal",
+      recommendedAssetClass: "Dana darurat, reksadana pasar uang",
+      isFallback: true
+    };
+  }
 
   const history = aggregations.map((agg) => ({
     totalExpense: agg.totalExpense,

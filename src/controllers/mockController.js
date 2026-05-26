@@ -1,7 +1,9 @@
 // src/controllers/mockController.js
 import { importMockTransactions } from "../services/mockImportService.js";
 import { createMockTransactions } from "../config/utils/mockGenerator.js";
+import { calculateMonthlyAggregation } from "../services/aggregationService.js";
 import prisma from "../lib/prisma.js";
+
 export const simulateOtp = (req, res, next) => {
   try {
     const { email } = req.body;
@@ -59,8 +61,7 @@ export const importTransactions = async (req, res, next) => {
     const uniqueMonths = [
       ...new Set(
         transactions.map((t) => {
-          const d = new Date(t.date_time);
-
+          const d = new Date(t.dateTime);
           return `${d.getFullYear()}-${d.getMonth() + 1}`;
         }),
       ),
@@ -68,12 +69,12 @@ export const importTransactions = async (req, res, next) => {
 
     for (const monthKey of uniqueMonths) {
       const [year, month] = monthKey.split("-");
-
       await calculateMonthlyAggregation(userId, Number(year), Number(month));
     }
 
     res.status(200).json({
       success: true,
+      message: "Mock transactions imported successfully",
       imported: saved.length,
     });
   } catch (err) {

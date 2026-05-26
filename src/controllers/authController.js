@@ -186,7 +186,7 @@ export async function register(req, res, next) {
       success: true,
       message: "Register successful",
       data: {
-        ...responseUser,
+        user: responseUser,
         token,
       },
     });
@@ -241,7 +241,7 @@ export async function login(req, res, next) {
       success: true,
       message: "Login successful",
       data: {
-        ...responseUser,
+        user: responseUser,
         token,
       },
     });

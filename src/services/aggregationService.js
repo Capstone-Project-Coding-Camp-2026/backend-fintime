@@ -1,6 +1,6 @@
 import prisma from "../lib/prisma.js";
 
-import { EXCLUDED_EXPENSE_CATEGORIES } from "../utils/constants.js";
+import { EXCLUDED_EXPENSE_CATEGORIES } from "../config/utils/constants.js";
 
 export async function calculateMonthlyAggregation(userId, year, month) {
   const startDate = new Date(year, month - 1, 1);
