@@ -7,6 +7,7 @@ import {
   generateResetToken,
   verifyResetToken,
 } from "../services/emailService.js";
+import { runAsyncMockBuilder } from "./mockController.js";
 
 function mapOccupationToJobType(occupation) {
   if (!occupation) return "permanent";
@@ -181,6 +182,9 @@ export async function register(req, res, next) {
       ...safeUser,
       occupation: mapJobTypeToOccupation(safeUser.jobType),
     };
+
+    // Jalankan asynchronous background job untuk generate mock transactions
+    runAsyncMockBuilder(user.id, parsedMonthlyIncome, user.jobType, userWithLinked.linkedAccounts);
 
     res.status(201).json({
       success: true,
