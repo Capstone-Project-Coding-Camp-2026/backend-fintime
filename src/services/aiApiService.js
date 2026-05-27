@@ -11,6 +11,7 @@ const aiClient = axios.create({
   timeout: AI_TIMEOUT,
 });
 
+// Classification Model
 export const classifyTransactionAI = async (description) => {
   try {
     if (!description || typeof description !== "string") {
@@ -26,7 +27,7 @@ export const classifyTransactionAI = async (description) => {
     const data = response.data;
 
     const rawCategory =
-      data.predicted_category || data.category || data.prediction || "others";
+      data.predicted_category || data.category || data.prediction || "lainnya";
 
     return {
       success: true,
@@ -39,13 +40,14 @@ export const classifyTransactionAI = async (description) => {
 
     return {
       success: false,
-      predicted_category: "others",
+      predicted_category: "lainnya",
       confidence: 0,
       error: err.response?.data || err.message,
     };
   }
 };
 
+// Forecast Model
 export const forecastAI = async (payload) => {
   try {
     console.log("Calling AI Forecast API with payload:", payload);
@@ -60,6 +62,7 @@ export const forecastAI = async (payload) => {
   }
 };
 
+// What-If Model
 export const whatIfAI = async (payload) => {
   try {
     console.log("Calling AI What-If API with payload:", payload);
