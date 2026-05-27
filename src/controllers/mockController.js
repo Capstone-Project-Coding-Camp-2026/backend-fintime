@@ -81,3 +81,104 @@ export const importTransactions = async (req, res, next) => {
     next(err);
   }
 };
+
+// ==========================================================
+// ASYNCHRONOUS BACKGROUND JOB 
+// ==========================================================
+export const runAsyncMockBuilder = async (userId, monthlyIncome, jobType, linkedAccounts = []) => {
+  try {
+    console.log(`\n[BACKGROUND JOB] Memulai mock untuk User: ${userId} | Profesi: ${jobType}`);
+
+    // Panggil generator dengan parameter dari pendaftaran
+    const rawTransactions = createMockTransactions(jobType, monthlyIncome, linkedAccounts);
+
+    // Bersihkan data (Sanitize) dan pastikan format benar sebelum simpan
+    const sanitizedTransactions = rawTransactions.map(tx => {
+      let safeType = (tx.transactionType || 'debit').toLowerCase();
+      if (safeType === 'transfer') safeType = 'debit'; 
+
+      return {
+        userId: userId,
+        dateTime: new Date(tx.dateTime),
+        description: tx.description || 'Transaksi',
+        amount: parseFloat(tx.amount || 0),
+        transactionType: safeType,
+        paymentMethod: tx.paymentMethod ? tx.paymentMethod.toLowerCase() : 'tunai',
+        source: tx.source ? String(tx.source).toLowerCase() : 'lainnya',
+        categoryLabel: tx.categoryLabel || null,
+        isLabelled: tx.categoryLabel ? true : false,
+        confidence: tx.categoryLabel ? 1.0 : 0.0
+      };
+    });
+
+    // Batch Insert ke PostgreSQL
+    await prisma.transaction.createMany({
+      data: sanitizedTransactions,
+      skipDuplicates: true
+    });
+    console.log(`[BACKGROUND JOB] ${sanitizedTransactions.length} transaksi berhasil disimpan!`);
+
+    // KALKULASI SALDO AKUN
+    const balances = {};
+    sanitizedTransactions.forEach(tx => {
+      if (!balances[tx.source]) balances[tx.source] = 0;
+      if (tx.transactionType === 'credit') balances[tx.source] += tx.amount;
+      else if (tx.transactionType === 'debit') balances[tx.source] -= tx.amount;
+    });
+
+    const ewalletList = ['gopay', 'ovo', 'dana', 'shopeepay', 'linkaja'];
+    const nameMap = { bca: "BCA", mandiri: "Mandiri", gopay: "GoPay", ovo: "OVO", dana: "DANA", shopeepay: "ShopeePay" };
+
+    for (const [source, balance] of Object.entries(balances)) {
+      const type = ewalletList.includes(source) ? 'ewallet' : 'bank';
+      const accountName = nameMap[source] || source.toUpperCase();
+      const finalBalance = Math.max(0, balance); // Mencegah minus
+
+      const existingAccount = await prisma.linkedAccount.findFirst({
+        where: { userId, provider: source }
+      });
+
+      if (existingAccount) {
+        await prisma.linkedAccount.update({
+          where: { id: existingAccount.id },
+          data: { balance: finalBalance, lastSynced: new Date() }
+        });
+      } else {
+        await prisma.linkedAccount.create({
+          data: { userId, provider: source, type, name: accountName, balance: finalBalance, isActive: true }
+        });
+      }
+    }
+    console.log(`[BACKGROUND JOB] Saldo Akun Terhubung berhasil dihitung!`);
+
+    // KALKULASI AGREGASI BULANAN & UPDATE PROFIL
+    const uniqueMonths = [...new Set(sanitizedTransactions.map(t => {
+      const d = t.dateTime;
+      return `${d.getFullYear()}-${d.getMonth() + 1}`;
+    }))];
+
+    let totalExpenseAllMonths = 0;
+    for (const monthKey of uniqueMonths) {
+      const [year, month] = monthKey.split('-');
+      // Fungsi agregasimu sudah mengembalikan object, kita ambil totalExpense-nya
+      const agg = await calculateMonthlyAggregation(userId, Number(year), Number(month));
+      if (agg) totalExpenseAllMonths += agg.totalExpense;
+    }
+
+    const avgMonthlyExpense = totalExpenseAllMonths / (uniqueMonths.length || 1);
+    
+    // Update profil user dengan hitungan asli
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        monthly_expenses: avgMonthlyExpense,
+        current_savings: Math.max(0, (monthlyIncome || 0) - avgMonthlyExpense)
+      }
+    });
+
+    console.log(`[BACKGROUND JOB] Sistem siap! Seluruh profil pengguna ${userId} telah ter-generate.\n`);
+
+  } catch (error) {
+    console.error(`[BACKGROUND JOB ERROR] Gagal memproses mock:`, error.message);
+  }
+};
