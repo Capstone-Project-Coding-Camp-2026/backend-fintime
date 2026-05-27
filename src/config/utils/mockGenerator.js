@@ -21,7 +21,7 @@ export const createMockTransactions = () => {
     },
     {
       desc: "TRANSFER KE GOPAY 0812345678",
-      type: "transfer",
+      type: "debit",
       method: "debit",
       src: "bca",
     },
@@ -40,7 +40,7 @@ export const createMockTransactions = () => {
     {
       desc: "GAJI BULANAN",
       type: "credit",
-      method: "transfer",
+      method: "debit",
       src: "bca",
     },
   ];

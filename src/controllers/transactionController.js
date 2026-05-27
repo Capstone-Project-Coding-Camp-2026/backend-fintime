@@ -170,10 +170,9 @@ export const relabelBatch = async (req, res) => {
 
 // Create a new transaction
 export const createTransaction = async (req, res) => {
-  const userId = req.user.sub;
   try {
+    const userIdFromToken = req.user.sub;
     const {
-      userId,
       dateTime,
       description,
       amount,
@@ -212,7 +211,7 @@ export const createTransaction = async (req, res) => {
 
     const transaction = await prisma.transaction.create({
       data: {
-        userId,
+        userId: userIdFromToken,
         dateTime: dateTime ? new Date(dateTime) : new Date(),
 
         description,

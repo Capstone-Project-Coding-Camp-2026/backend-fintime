@@ -6,6 +6,24 @@ import {
 
 import { generateForecast } from "../services/forecastService.js";
 import { runWhatIfAnalysis } from "../services/whatifService.js";
+import prisma from "../lib/prisma.js";
+
+export async function getLatestAvatarState(req, res, next) {
+  try {
+    const userId = req.user.sub;
+
+    const avatarState = await prisma.avatarState.findUnique({
+      where: { userId },
+    });
+
+    res.json({
+      success: true,
+      data: avatarState,
+    });
+  } catch (e) {
+    next(e);
+  }
+}
 
 export async function healthCheck(req, res, next) {
   try {
@@ -61,7 +79,21 @@ export async function forecast(req, res, next) {
 
 export const whatIf = async (req, res, next) => {
   try {
-    const result = await runWhatIfAnalysis(req.body);
+    const userId = req.user.sub;
+    const { 
+      itemPrice = 0, 
+      selectedOption = 'cash', 
+      installmentMonths = 1, 
+      interestRate = 0 
+    } = req.body;
+
+    const result = await runWhatIfAnalysis({
+      userId,
+      itemPrice: parseFloat(itemPrice) || 0,
+      selectedOption,
+      installmentMonths: parseInt(installmentMonths) || 1,
+      interestRate: parseFloat(interestRate) || 0,
+    });
 
     res.json({
       success: true,

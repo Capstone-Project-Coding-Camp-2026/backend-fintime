@@ -76,8 +76,23 @@ export async function calculateMonthlyAggregation(userId, year, month) {
       totalExpense,
       savingsCapacity,
       currentTotalBalance,
-      expenseByCategory,
       transactionCount: transactions.length,
+      expenseHousing: expenseByCategory["perumahan"] || 0,
+      expenseFoodDrink: expenseByCategory["makanan"] || 0,
+      expenseTransportation: expenseByCategory["transport"] || 0,
+      expenseEntertainment: expenseByCategory["hiburan"] || 0,
+      expenseHealth: expenseByCategory["kesehatan"] || 0,
+      expenseEducation: expenseByCategory["pendidikan"] || 0,
+      expenseShopping: expenseByCategory["belanja"] || 0,
+      expenseBills: expenseByCategory["tagihan"] || 0,
+      expenseInvestment: expenseByCategory["investasi"] || 0,
+      expenseOther:
+        (expenseByCategory["lainnya"] || 0) +
+        (expenseByCategory["tidak_diketahui"] || 0) +
+        (expenseByCategory["topup_ewallet"] || 0) +
+        (expenseByCategory["transfer_internal"] || 0) +
+        (expenseByCategory["transfer_keluarga"] || 0) +
+        (expenseByCategory["transfer_sosial"] || 0),
     },
 
     create: {
@@ -87,8 +102,23 @@ export async function calculateMonthlyAggregation(userId, year, month) {
       totalExpense,
       savingsCapacity,
       currentTotalBalance,
-      expenseByCategory,
       transactionCount: transactions.length,
+      expenseHousing: expenseByCategory["perumahan"] || 0,
+      expenseFoodDrink: expenseByCategory["makanan"] || 0,
+      expenseTransportation: expenseByCategory["transport"] || 0,
+      expenseEntertainment: expenseByCategory["hiburan"] || 0,
+      expenseHealth: expenseByCategory["kesehatan"] || 0,
+      expenseEducation: expenseByCategory["pendidikan"] || 0,
+      expenseShopping: expenseByCategory["belanja"] || 0,
+      expenseBills: expenseByCategory["tagihan"] || 0,
+      expenseInvestment: expenseByCategory["investasi"] || 0,
+      expenseOther:
+        (expenseByCategory["lainnya"] || 0) +
+        (expenseByCategory["tidak_diketahui"] || 0) +
+        (expenseByCategory["topup_ewallet"] || 0) +
+        (expenseByCategory["transfer_internal"] || 0) +
+        (expenseByCategory["transfer_keluarga"] || 0) +
+        (expenseByCategory["transfer_sosial"] || 0),
     },
   });
 

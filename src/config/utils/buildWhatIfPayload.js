@@ -8,9 +8,21 @@ export const buildWhatIfPayload = ({
   interestRate,
   itemPrice,
 }) => {
+  // Calculate age safely
+  let userAge = 25; // default
+  if (user.birthDate) {
+    const birth = new Date(user.birthDate);
+    const today = new Date();
+    userAge = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+      userAge--;
+    }
+  }
+
   return {
     user_profile: {
-      age: user.age,
+      age: userAge,
       total_income: monthlyIncome,
       monthly_expenses: monthlyExpense,
       current_savings: totalBalance,
