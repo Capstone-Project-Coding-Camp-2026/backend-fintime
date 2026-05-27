@@ -2,6 +2,7 @@
 import { importMockTransactions } from "../services/mockImportService.js";
 import { createMockTransactions } from "../config/utils/mockGenerator.js";
 import { calculateMonthlyAggregation } from "../services/aggregationService.js";
+import { classifyTransactionAI } from "../services/aiApiService.js";
 import prisma from "../lib/prisma.js";
 
 export const simulateOtp = (req, res, next) => {
@@ -89,13 +90,54 @@ export const runAsyncMockBuilder = async (userId, monthlyIncome, jobType, linked
   try {
     console.log(`\n[BACKGROUND JOB] Memulai mock untuk User: ${userId} | Profesi: ${jobType}`);
 
-    // Panggil generator dengan parameter dari pendaftaran
+    // 1. Panggil generator (beberapa transaksi seperti STARBUCKS masih memiliki categoryLabel: null)
     const rawTransactions = createMockTransactions(jobType, monthlyIncome, linkedAccounts);
 
-    // Bersihkan data (Sanitize) dan pastikan format benar sebelum simpan
+    // ==========================================================
+    // AI BATCH PROCESSING
+    // ==========================================================
+    // Ambil deskripsi yang butuh diprediksi saja (yang belum di-hardcode)
+    const unlabelledDesc = rawTransactions
+      .filter(tx => tx.categoryLabel === null)
+      .map(tx => tx.description);
+    
+    const uniqueDescriptions = [...new Set(unlabelledDesc)];
+    console.log(`[BACKGROUND JOB] Meminta AI di Railway memproses ${uniqueDescriptions.length} teks unik...`);
+
+    const aiDictionary = {};
+    const BATCH_SIZE = 5; // Maksimal 5 request bersamaan agar server Railway tidak down
+    
+    for (let i = 0; i < uniqueDescriptions.length; i += BATCH_SIZE) {
+      const batch = uniqueDescriptions.slice(i, i + BATCH_SIZE);
+      
+      const batchResults = await Promise.all(
+        batch.map(async (desc) => {
+          try {
+            // Panggil API (Pastikan service-nya membungkus 'desc' sesuai format)
+            const aiResult = await classifyTransactionAI(desc);
+            return { desc, category: aiResult.predicted_category || "lainnya" };
+          } catch (err) {
+            console.warn(`[AI WARN] Gagal prediksi "${desc}", fallback ke "lainnya".`);
+            return { desc, category: "lainnya" };
+          }
+        })
+      );
+
+      batchResults.forEach(res => {
+        aiDictionary[res.desc] = res.category;
+      });
+    }
+    console.log(`[BACKGROUND JOB] Batching AI selesai! Kamus kategori siap digunakan.`);
+    // ==========================================================
+
+    // 2. Bersihkan data (Sanitize) dan tempelkan hasil prediksi AI
     const sanitizedTransactions = rawTransactions.map(tx => {
       let safeType = (tx.transactionType || 'debit').toLowerCase();
       if (safeType === 'transfer') safeType = 'debit'; 
+
+      // Jika dari generator sudah ada (misal: "transfer_internal"), pakai itu. 
+      // Jika null, cari di kamus AI. Jika AI gagal/kosong, masukkan ke "lainnya".
+      const finalCategoryLabel = tx.categoryLabel || aiDictionary[tx.description] || "lainnya";
 
       return {
         userId: userId,
@@ -105,20 +147,21 @@ export const runAsyncMockBuilder = async (userId, monthlyIncome, jobType, linked
         transactionType: safeType,
         paymentMethod: tx.paymentMethod ? tx.paymentMethod.toLowerCase() : 'tunai',
         source: tx.source ? String(tx.source).toLowerCase() : 'lainnya',
-        categoryLabel: tx.categoryLabel || null,
-        isLabelled: tx.categoryLabel ? true : false,
-        confidence: tx.categoryLabel ? 1.0 : 0.0
+        categoryLabel: finalCategoryLabel,
+        // Logika Relabeling: Jika "lainnya", isLabelled = false agar user bisa membenarkannya di UI
+        isLabelled: finalCategoryLabel !== "lainnya", 
+        confidence: finalCategoryLabel !== "lainnya" ? 0.85 : 0.0 
       };
     });
 
-    // Batch Insert ke PostgreSQL
+    // 3. Batch Insert ke PostgreSQL
     await prisma.transaction.createMany({
       data: sanitizedTransactions,
       skipDuplicates: true
     });
     console.log(`[BACKGROUND JOB] ${sanitizedTransactions.length} transaksi berhasil disimpan!`);
 
-    // KALKULASI SALDO AKUN
+    // 4. KALKULASI SALDO AKUN
     const balances = {};
     sanitizedTransactions.forEach(tx => {
       if (!balances[tx.source]) balances[tx.source] = 0;
@@ -151,7 +194,7 @@ export const runAsyncMockBuilder = async (userId, monthlyIncome, jobType, linked
     }
     console.log(`[BACKGROUND JOB] Saldo Akun Terhubung berhasil dihitung!`);
 
-    // KALKULASI AGREGASI BULANAN & UPDATE PROFIL
+    // 5. KALKULASI AGREGASI BULANAN & UPDATE PROFIL
     const uniqueMonths = [...new Set(sanitizedTransactions.map(t => {
       const d = t.dateTime;
       return `${d.getFullYear()}-${d.getMonth() + 1}`;
@@ -160,14 +203,12 @@ export const runAsyncMockBuilder = async (userId, monthlyIncome, jobType, linked
     let totalExpenseAllMonths = 0;
     for (const monthKey of uniqueMonths) {
       const [year, month] = monthKey.split('-');
-      // Fungsi agregasimu sudah mengembalikan object, kita ambil totalExpense-nya
       const agg = await calculateMonthlyAggregation(userId, Number(year), Number(month));
       if (agg) totalExpenseAllMonths += agg.totalExpense;
     }
 
     const avgMonthlyExpense = totalExpenseAllMonths / (uniqueMonths.length || 1);
     
-    // Update profil user dengan hitungan asli
     await prisma.user.update({
       where: { id: userId },
       data: {
