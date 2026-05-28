@@ -137,7 +137,11 @@ export const runAsyncMockBuilder = async (userId, monthlyIncome, jobType, linked
 
       // Jika dari generator sudah ada (misal: "transfer_internal"), pakai itu. 
       // Jika null, cari di kamus AI. Jika AI gagal/kosong, masukkan ke "lainnya".
-      const finalCategoryLabel = tx.categoryLabel || aiDictionary[tx.description] || "lainnya";
+      let finalCategoryLabel = tx.categoryLabel || aiDictionary[tx.description] || 'lainnya'
+      // sementara paksa sebagian transaksi jadi lainnya
+      if (Math.random() < 0.2) {
+        finalCategoryLabel = 'lainnya'
+      }
 
       return {
         userId: userId,
