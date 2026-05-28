@@ -90,13 +90,12 @@ export const runAsyncMockBuilder = async (userId, monthlyIncome, jobType, linked
   try {
     console.log(`\n[BACKGROUND JOB] Memulai mock untuk User: ${userId} | Profesi: ${jobType}`);
 
-    // 1. Panggil generator (beberapa transaksi seperti STARBUCKS masih memiliki categoryLabel: null)
+    // Panggil generator
     const rawTransactions = createMockTransactions(jobType, monthlyIncome, linkedAccounts);
 
     // ==========================================================
     // AI BATCH PROCESSING
     // ==========================================================
-    // Ambil deskripsi yang butuh diprediksi saja (yang belum di-hardcode)
     const unlabelledDesc = rawTransactions
       .filter(tx => tx.categoryLabel === null)
       .map(tx => tx.description);
@@ -105,7 +104,8 @@ export const runAsyncMockBuilder = async (userId, monthlyIncome, jobType, linked
     console.log(`[BACKGROUND JOB] Meminta AI di Railway memproses ${uniqueDescriptions.length} teks unik...`);
 
     const aiDictionary = {};
-    const BATCH_SIZE = 5; // Maksimal 5 request bersamaan agar server Railway tidak down
+    const BATCH_SIZE = 5; 
+    const AUTO_LABEL_THRESHOLD = 0.85;
     
     for (let i = 0; i < uniqueDescriptions.length; i += BATCH_SIZE) {
       const batch = uniqueDescriptions.slice(i, i + BATCH_SIZE);
@@ -113,31 +113,54 @@ export const runAsyncMockBuilder = async (userId, monthlyIncome, jobType, linked
       const batchResults = await Promise.all(
         batch.map(async (desc) => {
           try {
-            // Panggil API (Pastikan service-nya membungkus 'desc' sesuai format)
             const aiResult = await classifyTransactionAI(desc);
-            return { desc, category: aiResult.predicted_category || "lainnya" };
+            return { 
+              desc, 
+              category: aiResult.predicted_category || "lainnya",
+              confidence: aiResult.confidence || 0
+            };
           } catch (err) {
             console.warn(`[AI WARN] Gagal prediksi "${desc}", fallback ke "lainnya".`);
-            return { desc, category: "lainnya" };
+            return { desc, category: "lainnya", confidence: 0 };
           }
         })
       );
 
       batchResults.forEach(res => {
-        aiDictionary[res.desc] = res.category;
+        aiDictionary[res.desc] = { category: res.category, confidence: res.confidence };
       });
     }
     console.log(`[BACKGROUND JOB] Batching AI selesai! Kamus kategori siap digunakan.`);
-    // ==========================================================
 
-    // 2. Bersihkan data (Sanitize) dan tempelkan hasil prediksi AI
+    // Bersihkan data (Sanitize)
     const sanitizedTransactions = rawTransactions.map(tx => {
       let safeType = (tx.transactionType || 'debit').toLowerCase();
       if (safeType === 'transfer') safeType = 'debit'; 
 
-      // Jika dari generator sudah ada (misal: "transfer_internal"), pakai itu. 
-      // Jika null, cari di kamus AI. Jika AI gagal/kosong, masukkan ke "lainnya".
-      const finalCategoryLabel = tx.categoryLabel || aiDictionary[tx.description] || "lainnya";
+      let finalCategoryLabel = tx.categoryLabel;
+      let finalConfidence = 1.0;
+      let isFinalLabelled = true;
+
+      // Jika categoryLabel null, berarti data ini dikirimkan ke AI
+      if (tx.categoryLabel === null) {
+        const aiData = aiDictionary[tx.description] || { category: "lainnya", confidence: 0 };
+        finalCategoryLabel = aiData.category;
+        finalConfidence = aiData.confidence;
+        
+        // Logika Thresholding AI Asli
+        if (finalCategoryLabel === "lainnya" || finalConfidence < AUTO_LABEL_THRESHOLD) {
+            isFinalLabelled = false; 
+        }
+
+        // Trik Cerdasmu (Opsional: Hapus blok ini nanti jika aplikasimu sudah rilis/Production)
+        /*
+        if (Math.random() < 0.2) {
+          finalCategoryLabel = 'lainnya';
+          isFinalLabelled = false;
+          finalConfidence = 0.0;
+        }
+        */
+      }
 
       return {
         userId: userId,
@@ -148,20 +171,19 @@ export const runAsyncMockBuilder = async (userId, monthlyIncome, jobType, linked
         paymentMethod: tx.paymentMethod ? tx.paymentMethod.toLowerCase() : 'tunai',
         source: tx.source ? String(tx.source).toLowerCase() : 'lainnya',
         categoryLabel: finalCategoryLabel,
-        // Logika Relabeling: Jika "lainnya", isLabelled = false agar user bisa membenarkannya di UI
-        isLabelled: finalCategoryLabel !== "lainnya", 
-        confidence: finalCategoryLabel !== "lainnya" ? 0.85 : 0.0 
+        isLabelled: isFinalLabelled, 
+        confidence: finalConfidence 
       };
     });
 
-    // 3. Batch Insert ke PostgreSQL
+    // Batch Insert ke PostgreSQL
     await prisma.transaction.createMany({
       data: sanitizedTransactions,
       skipDuplicates: true
     });
     console.log(`[BACKGROUND JOB] ${sanitizedTransactions.length} transaksi berhasil disimpan!`);
 
-    // 4. KALKULASI SALDO AKUN
+    // KALKULASI SALDO AKUN
     const balances = {};
     sanitizedTransactions.forEach(tx => {
       if (!balances[tx.source]) balances[tx.source] = 0;
@@ -175,7 +197,7 @@ export const runAsyncMockBuilder = async (userId, monthlyIncome, jobType, linked
     for (const [source, balance] of Object.entries(balances)) {
       const type = ewalletList.includes(source) ? 'ewallet' : 'bank';
       const accountName = nameMap[source] || source.toUpperCase();
-      const finalBalance = Math.max(0, balance); // Mencegah minus
+      const finalBalance = Math.max(0, balance); 
 
       const existingAccount = await prisma.linkedAccount.findFirst({
         where: { userId, provider: source }
@@ -194,7 +216,7 @@ export const runAsyncMockBuilder = async (userId, monthlyIncome, jobType, linked
     }
     console.log(`[BACKGROUND JOB] Saldo Akun Terhubung berhasil dihitung!`);
 
-    // 5. KALKULASI AGREGASI BULANAN & UPDATE PROFIL
+    // KALKULASI AGREGASI BULANAN
     const uniqueMonths = [...new Set(sanitizedTransactions.map(t => {
       const d = t.dateTime;
       return `${d.getFullYear()}-${d.getMonth() + 1}`;
