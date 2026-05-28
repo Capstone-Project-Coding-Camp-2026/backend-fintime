@@ -137,6 +137,7 @@ export const runAsyncMockBuilder = async (userId, monthlyIncome, jobType, linked
       let safeType = (tx.transactionType || 'debit').toLowerCase();
       if (safeType === 'transfer') safeType = 'debit'; 
 
+<<<<<<< HEAD
       let finalCategoryLabel = tx.categoryLabel;
       let finalConfidence = 1.0;
       let isFinalLabelled = true;

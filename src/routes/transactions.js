@@ -143,20 +143,25 @@ router.put("/:transactionId/relabel", authMiddleware, async (req, res) => {
     const { categoryLabel } = req.body;
 
     const validCategories = [
-      "belanja",
-      "hiburan",
-      "kesehatan",
-      "lainnya",
-      "makanan",
-      "pendidikan",
-      "tagihan",
-      "tidak_diketahui",
-      "topup_ewallet",
-      "transfer_internal",
-      "transfer_keluarga",
-      "transfer_sosial",
-      "transport",
-    ];
+      'perumahan',
+      'makanan',
+      'transport',
+      'hiburan',
+      'kesehatan',
+      'pendidikan',
+      'belanja',
+      'tagihan',
+      'gaji',
+      'investasi',
+      'freelance',
+      'hadiah',
+      'lainnya',
+      'tidak_diketahui',
+      'topup_ewallet',
+      'transfer_internal',
+      'transfer_keluarga',
+      'transfer_sosial',
+    ]
 
     if (!validCategories.includes(categoryLabel)) {
       return res.status(400).json({
@@ -172,13 +177,60 @@ router.put("/:transactionId/relabel", authMiddleware, async (req, res) => {
         isLabelled: true,
         confidence: 1.0,
       },
-    });
+    })
+
+    // 2. Save label rule to User.labelRules
+    const matchKey = (transaction.description || '').toLowerCase().trim()
+    let autoRelabelledCount = 0
+    if (matchKey && transaction.userId) {
+      const user = await prisma.user.findUnique({
+        where: { id: transaction.userId },
+        select: { labelRules: true },
+      })
+      if (user) {
+        let rules = Array.isArray(user.labelRules) ? [...user.labelRules] : []
+        const existingIdx = rules.findIndex((r) => r.match && r.match.toLowerCase() === matchKey)
+        if (existingIdx >= 0) {
+          rules[existingIdx] = { match: matchKey, category: categoryLabel }
+        } else {
+          rules.push({ match: matchKey, category: categoryLabel })
+        }
+        await prisma.user.update({
+          where: { id: transaction.userId },
+          data: { labelRules: rules },
+        })
+        // 3. Auto-relabel other matching unlabelled transactions
+        const matchingTx = await prisma.transaction.findMany({
+          where: {
+            userId: transaction.userId,
+            id: { not: transactionId },
+            OR: [{ isLabelled: false }, { categoryLabel: null }, { categoryLabel: 'lainnya' }],
+            description: {
+              contains: matchKey,
+              mode: 'insensitive',
+            },
+          },
+        })
+        if (matchingTx.length > 0) {
+          const result = await prisma.transaction.updateMany({
+            where: { id: { in: matchingTx.map((t) => t.id) } },
+            data: {
+              categoryLabel,
+              confidence: 1.0,
+              isLabelled: true,
+            },
+          })
+          autoRelabelledCount = result.count
+        }
+      }
+    }
 
     res.json({
       success: true,
       message: "Transaction relabelled successfully",
       data: transaction,
-    });
+      autoRelabelledCount,
+    })
   } catch (error) {
     console.error("Error relabelling transaction:", error);
     res.status(500).json({ success: false, message: "Server error" });
@@ -191,20 +243,25 @@ router.put("/relabel-batch", authMiddleware, async (req, res) => {
     const { transactionIds, categoryLabel } = req.body;
 
     const validCategories = [
-      "belanja",
-      "hiburan",
-      "kesehatan",
-      "lainnya",
-      "makanan",
-      "pendidikan",
-      "tagihan",
-      "tidak_diketahui",
-      "topup_ewallet",
-      "transfer_internal",
-      "transfer_keluarga",
-      "transfer_sosial",
-      "transport",
-    ];
+      'perumahan',
+      'makanan',
+      'transport',
+      'hiburan',
+      'kesehatan',
+      'pendidikan',
+      'belanja',
+      'tagihan',
+      'gaji',
+      'investasi',
+      'freelance',
+      'hadiah',
+      'lainnya',
+      'tidak_diketahui',
+      'topup_ewallet',
+      'transfer_internal',
+      'transfer_keluarga',
+      'transfer_sosial',
+    ]
 
     if (!validCategories.includes(categoryLabel)) {
       return res.status(400).json({
