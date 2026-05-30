@@ -51,6 +51,28 @@ export async function importMockTransactions(userId, transactions) {
       },
     });
 
+    // Update budget spent if applicable
+    if (categoryLabel !== "lainnya" && trx.transactionType === "debit") {
+      const budget = await prisma.budget.findFirst({
+        where: {
+          userId,
+          category: {
+            equals: categoryLabel,
+            mode: "insensitive",
+          },
+          period: "monthly",
+          isActive: true,
+        },
+      });
+
+      if (budget) {
+        await prisma.budget.update({
+          where: { id: budget.id },
+          data: { spent: { increment: trx.amount } },
+        });
+      }
+    }
+
     savedTransactions.push(saved);
   }
 

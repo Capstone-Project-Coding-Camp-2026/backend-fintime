@@ -17,16 +17,39 @@ export async function calculateMonthlyAggregation(userId, year, month) {
 
   let totalIncome = 0
   let totalExpense = 0
-  let expenseHousing = 0
-  let expenseFoodDrink = 0
-  let expenseTransportation = 0
-  let expenseEntertainment = 0
-  let expenseHealth = 0
-  let expenseEducation = 0
-  let expenseShopping = 0
-  let expenseBills = 0
-  let expenseInvestment = 0
-  let expenseOther = 0
+  const expenses = {
+    expenseHousing: 0,
+    expenseFoodDrink: 0,
+    expenseTransportation: 0,
+    expenseEntertainment: 0,
+    expenseHealth: 0,
+    expenseEducation: 0,
+    expenseShopping: 0,
+    expenseBills: 0,
+    expenseInvestment: 0,
+    expenseOther: 0,
+  }
+
+  const categoryMap = {
+    makanan: 'expenseFoodDrink',
+    food: 'expenseFoodDrink',
+    transport: 'expenseTransportation',
+    transportasi: 'expenseTransportation',
+    hiburan: 'expenseEntertainment',
+    entertainment: 'expenseEntertainment',
+    belanja: 'expenseShopping',
+    shopping: 'expenseShopping',
+    tagihan: 'expenseBills',
+    bills: 'expenseBills',
+    kesehatan: 'expenseHealth',
+    health: 'expenseHealth',
+    pendidikan: 'expenseEducation',
+    education: 'expenseEducation',
+    perumahan: 'expenseHousing',
+    housing: 'expenseHousing',
+    investasi: 'expenseInvestment',
+    investment: 'expenseInvestment',
+  };
 
   for (const t of transactions) {
     if (t.transactionType === 'credit') {
@@ -37,17 +60,9 @@ export async function calculateMonthlyAggregation(userId, year, month) {
         totalExpense += t.amount
 
         // Categorize
-        const cat = t.categoryLabel || 'lainnya'
-        if (cat === 'makanan' || cat === 'food') expenseFoodDrink += t.amount
-        else if (cat === 'transport' || cat === 'transportasi') expenseTransportation += t.amount
-        else if (cat === 'hiburan' || cat === 'entertainment') expenseEntertainment += t.amount
-        else if (cat === 'belanja' || cat === 'shopping') expenseShopping += t.amount
-        else if (cat === 'tagihan' || cat === 'bills') expenseBills += t.amount
-        else if (cat === 'kesehatan' || cat === 'health') expenseHealth += t.amount
-        else if (cat === 'pendidikan' || cat === 'education') expenseEducation += t.amount
-        else if (cat === 'perumahan' || cat === 'housing') expenseHousing += t.amount
-        else if (cat === 'investasi' || cat === 'investment') expenseInvestment += t.amount
-        else expenseOther += t.amount
+        const cat = t.categoryLabel?.toLowerCase() || 'lainnya'
+        const target = categoryMap[cat] || 'expenseOther'
+        expenses[target] += t.amount
       }
     }
   }
@@ -67,16 +82,7 @@ export async function calculateMonthlyAggregation(userId, year, month) {
     update: {
       totalIncome,
       totalExpense,
-      expenseHousing,
-      expenseFoodDrink,
-      expenseTransportation,
-      expenseEntertainment,
-      expenseHealth,
-      expenseEducation,
-      expenseShopping,
-      expenseBills,
-      expenseInvestment,
-      expenseOther,
+      ...expenses,
       savingsCapacity,
       expenseToIncomeRatio,
       savingsRate,
@@ -87,16 +93,7 @@ export async function calculateMonthlyAggregation(userId, year, month) {
       monthYear,
       totalIncome,
       totalExpense,
-      expenseHousing,
-      expenseFoodDrink,
-      expenseTransportation,
-      expenseEntertainment,
-      expenseHealth,
-      expenseEducation,
-      expenseShopping,
-      expenseBills,
-      expenseInvestment,
-      expenseOther,
+      ...expenses,
       savingsCapacity,
       expenseToIncomeRatio,
       savingsRate,

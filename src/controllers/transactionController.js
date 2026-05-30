@@ -1,47 +1,40 @@
-// Transaction & LinkedAccount Controller - Prisma
-import prisma from "../lib/prisma.js";
-import { classifyTransactionAI } from "../services/aiApiService.js";
-import { classifyWithRules } from "../services/nlpService.js";
+// Transaction & LinkedAccount Controller
+import prisma from '../lib/prisma.js'
+import { classifyWithRules } from '../services/nlpService.js'
+import { TRANSACTION_CATEGORIES } from '../constants/transactionCategories.js'
 
 export const getTransactions = async (req, res) => {
   try {
-    const userId = req.params.userId;
+    const userId = req.params.userId
     if (req.user.sub !== userId) {
       return res.status(403).json({
         success: false,
-        message: "Forbidden",
-      });
+        message: 'Forbidden',
+      })
     }
-    const {
-      page = 1,
-      limit = 20,
-      startDate,
-      endDate,
-      category,
-      type,
-    } = req.query;
+    const { page = 1, limit = 20, startDate, endDate, category, type } = req.query
 
-    const where = { userId };
+    const where = { userId }
 
     if (startDate || endDate) {
-      where.dateTime = {};
-      if (startDate) where.dateTime.gte = new Date(startDate);
-      if (endDate) where.dateTime.lte = new Date(endDate);
+      where.dateTime = {}
+      if (startDate) where.dateTime.gte = new Date(startDate)
+      if (endDate) where.dateTime.lte = new Date(endDate)
     }
 
-    if (category) where.categoryLabel = category;
-    if (type) where.transactionType = type;
+    if (category) where.categoryLabel = category
+    if (type) where.transactionType = type
 
-    const skip = (page - 1) * limit;
+    const skip = (page - 1) * limit
     const [transactions, total] = await Promise.all([
       prisma.transaction.findMany({
         where,
-        orderBy: { dateTime: "desc" },
+        orderBy: { dateTime: 'desc' },
         skip: parseInt(skip),
         take: parseInt(limit),
       }),
       prisma.transaction.count({ where }),
-    ]);
+    ])
 
     res.json({
       success: true,
@@ -52,58 +45,54 @@ export const getTransactions = async (req, res) => {
         total,
         pages: Math.ceil(total / limit),
       },
-    });
+    })
   } catch (error) {
-    console.error("Error getting transactions:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error('Error getting transactions:', error)
+    res.status(500).json({ success: false, message: 'Server error' })
   }
-};
+}
 
 // Get unlabelled transactions
 export const getUnlabelledTransactions = async (req, res) => {
   try {
-    const userId = req.params.userId;
+    const userId = req.params.userId
     if (req.user.sub !== userId) {
       return res.status(403).json({
         success: false,
-        message: "Forbidden",
-      });
+        message: 'Forbidden',
+      })
     }
 
     const transactions = await prisma.transaction.findMany({
       where: {
         userId,
-        OR: [
-          { categoryLabel: null },
-          { categoryLabel: "lainnya" },
-          { isLabelled: false },
-        ],
+        OR: [{ categoryLabel: null }, { categoryLabel: 'lainnya' }, { isLabelled: false }],
       },
-      orderBy: { dateTime: "desc" },
-    });
+      orderBy: { dateTime: 'desc' },
+    })
 
     res.json({
       success: true,
       data: transactions,
       count: transactions.length,
-    });
+    })
   } catch (error) {
-    console.error("Error getting unlabelled transactions:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error('Error getting unlabelled transactions:', error)
+    res.status(500).json({ success: false, message: 'Server error' })
   }
-};
+}
 
 // Relabel a single transaction
 export const relabelTransaction = async (req, res) => {
   try {
-    const { transactionId } = req.params;
-    const { categoryLabel } = req.body;
+    const { transactionId } = req.params
+    const { categoryLabel } = req.body
 
     if (!TRANSACTION_CATEGORIES.includes(categoryLabel)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid category label",
-      });
+        message: 'Invalid category label',
+      })
     }
 
     const transaction = await prisma.transaction.update({
@@ -113,41 +102,37 @@ export const relabelTransaction = async (req, res) => {
         isLabelled: true,
         confidence: 1.0,
       },
-    });
+    })
 
     res.json({
       success: true,
-      message: "Transaction relabelled successfully",
+      message: 'Transaction relabelled successfully',
       data: transaction,
-    });
+    })
   } catch (error) {
-    console.error("Error relabelling transaction:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error('Error relabelling transaction:', error)
+    res.status(500).json({ success: false, message: 'Server error' })
   }
-};
+}
 
 // Batch relabel transactions
 export const relabelBatch = async (req, res) => {
   try {
-    const { transactionIds } = req.body;
-    const { categoryLabel } = req.body;
+    const { transactionIds } = req.body
+    const { categoryLabel } = req.body
 
     if (!TRANSACTION_CATEGORIES.includes(categoryLabel)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid category label",
-      });
+        message: 'Invalid category label',
+      })
     }
 
-    if (
-      !transactionIds ||
-      !Array.isArray(transactionIds) ||
-      transactionIds.length === 0
-    ) {
+    if (!transactionIds || !Array.isArray(transactionIds) || transactionIds.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "transactionIds must be a non-empty array",
-      });
+        message: 'transactionIds must be a non-empty array',
+      })
     }
 
     const result = await prisma.transaction.updateMany({
@@ -157,23 +142,22 @@ export const relabelBatch = async (req, res) => {
         isLabelled: true,
         confidence: 1.0,
       },
-    });
+    })
 
     res.json({
       success: true,
       message: `${result.count} transactions relabelled`,
       modifiedCount: result.count,
-    });
+    })
   } catch (error) {
-    console.error("Error batch relabelling:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error('Error batch relabelling:', error)
+    res.status(500).json({ success: false, message: 'Server error' })
   }
-};
+}
 
-// Create a new transaction
 export const createTransaction = async (req, res) => {
   try {
-    const userIdFromToken = req.user.sub;
+    const userIdFromToken = req.user.sub
     const {
       dateTime,
       description,
@@ -181,37 +165,48 @@ export const createTransaction = async (req, res) => {
       transactionType,
       paymentMethod,
       categoryLabel: manualCategoryLabel,
-    } = req.body;
+    } = req.body
 
-    // Ambil label_rules user
+    // Ambil label_rules user (handle stringified JSON)
     const user = await prisma.user.findUnique({
       where: { id: userIdFromToken },
       select: { labelRules: true },
-    });
-    const labelRules = Array.isArray(user?.labelRules) ? user.labelRules : [];
-
-    // Klasifikasi: label_rules kemudian  NLP (AI API) lalu fallback
-    let predictedCategory = manualCategoryLabel || "lainnya";
-    let confidence = manualCategoryLabel ? 1.0 : 0;
-    let isLabelled = !!manualCategoryLabel;
-
-    if (!manualCategoryLabel || manualCategoryLabel === "lainnya") {
+    })
+    let labelRules = []
+    if (Array.isArray(user?.labelRules)) {
+      labelRules = user.labelRules
+    } else if (typeof user?.labelRules === 'string') {
       try {
-        const result = await classifyWithRules(description, labelRules);
-        predictedCategory = result.category;
-        confidence = result.confidence;
-        isLabelled = result.isLabelled;
-      } catch (aiError) {
-        console.error("[createTransaction] Classification failed:", aiError.message);
-        predictedCategory = "lainnya";
-        confidence = 0;
-        isLabelled = false;
+        labelRules = JSON.parse(user.labelRules)
+      } catch (e) {
+        console.warn('[createTransaction] Failed to parse labelRules JSON:', e)
+        labelRules = []
       }
     }
 
-    // =========================================
+    // Klasifikasi: label_rules kemudian  NLP (AI API) lalu fallback
+    let predictedCategory = manualCategoryLabel || 'lainnya'
+    let confidence = manualCategoryLabel ? 1.0 : 0
+    let isLabelled = !!manualCategoryLabel
+
+    if (!manualCategoryLabel || manualCategoryLabel === 'lainnya') {
+      try {
+        const result = await classifyWithRules(description, labelRules)
+        // result may be null if no rule matches and AI fallback returns unlabelled
+        if (result) {
+          predictedCategory = result.category
+          confidence = result.confidence
+          isLabelled = result.isLabelled
+        }
+      } catch (aiError) {
+        console.error('[createTransaction] Classification failed:', aiError.message)
+        predictedCategory = 'lainnya'
+        confidence = 0
+        isLabelled = false
+      }
+    }
+
     // Save transaction
-    // =========================================
     const transaction = await prisma.transaction.create({
       data: {
         userId: userIdFromToken,
@@ -219,110 +214,103 @@ export const createTransaction = async (req, res) => {
         description,
         amount,
         transactionType,
-        paymentMethod: paymentMethod || "tunai",
+        paymentMethod: paymentMethod || 'tunai',
         categoryLabel: predictedCategory,
         isLabelled,
         confidence,
       },
-    });
+    })
 
     res.status(201).json({
       success: true,
-      message: "Transaction created",
+      message: 'Transaction created',
       data: transaction,
-    });
+    })
   } catch (error) {
-    console.error("Error creating transaction:", error);
+    console.error('Error creating transaction:', error)
 
     res.status(500).json({
       success: false,
-      message: "Server error",
-    });
+      message: 'Server error',
+    })
   }
-};
+}
 
 // Get monthly aggregation
 export const getMonthlyAggregation = async (req, res) => {
   try {
-    const userId = req.params.userId;
+    const userId = req.params.userId
     if (req.user.sub !== userId) {
       return res.status(403).json({
         success: false,
-        message: "Forbidden",
-      });
+        message: 'Forbidden',
+      })
     }
-    const { year, month } = req.query;
+    const { year, month } = req.query
 
-    const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-    const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
+    const startDate = new Date(parseInt(year), parseInt(month) - 1, 1)
+    const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59)
 
     const transactions = await prisma.transaction.findMany({
       where: {
         userId,
         dateTime: { gte: startDate, lte: endDate },
       },
-    });
+    })
 
     const totalIncome = transactions
-      .filter((t) => t.transactionType === "credit")
-      .reduce((sum, t) => sum + t.amount, 0);
+      .filter((t) => t.transactionType === 'credit')
+      .reduce((sum, t) => sum + t.amount, 0)
 
     const totalExpense = transactions
-      .filter((t) => t.transactionType === "debit")
-      .reduce((sum, t) => sum + t.amount, 0);
+      .filter((t) => t.transactionType === 'debit')
+      .reduce((sum, t) => sum + t.amount, 0)
 
     // Calculate by category
-    const expenseByCategory = {};
+    const expenseByCategory = {}
     transactions
-      .filter((t) => t.transactionType === "debit" && t.categoryLabel)
+      .filter((t) => t.transactionType === 'debit' && t.categoryLabel)
       .forEach((t) => {
         if (!expenseByCategory[t.categoryLabel]) {
-          expenseByCategory[t.categoryLabel] = 0;
+          expenseByCategory[t.categoryLabel] = 0
         }
-        expenseByCategory[t.categoryLabel] += t.amount;
-      });
+        expenseByCategory[t.categoryLabel] += t.amount
+      })
 
     res.json({
       success: true,
       data: {
-        month_year: `${year}-${String(month).padStart(2, "0")}`,
+        month_year: `${year}-${String(month).padStart(2, '0')}`,
         total_income: totalIncome,
         total_expense: totalExpense,
         savings_capacity: totalIncome - totalExpense,
         expense_by_category: expenseByCategory,
         transaction_count: transactions.length,
       },
-    });
+    })
   } catch (error) {
-    console.error("Error getting monthly aggregation:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error('Error getting monthly aggregation:', error)
+    res.status(500).json({ success: false, message: 'Server error' })
   }
-};
-
-// ============================================================
-// LINKED ACCOUNT CONTROLLER
-// ============================================================
+}
 
 // Get all linked accounts for a user
 export const getLinkedAccounts = async (req, res) => {
   try {
-    const userId = req.params.userId;
+    const userId = req.params.userId
     if (req.user.sub !== userId) {
       return res.status(403).json({
         success: false,
-        message: "Forbidden",
-      });
+        message: 'Forbidden',
+      })
     }
 
     const accounts = await prisma.linkedAccount.findMany({
       where: { userId, isActive: true },
-      orderBy: { createdAt: "desc" },
-    });
+      orderBy: { createdAt: 'desc' },
+    })
 
-    const totalBalance = accounts.reduce(
-      (sum, acc) => sum + (acc.balance || 0),
-      0,
-    );
+    const totalBalance = accounts.reduce((sum, acc) => sum + (acc.balance || 0), 0)
 
     res.json({
       success: true,
@@ -331,29 +319,29 @@ export const getLinkedAccounts = async (req, res) => {
         count: accounts.length,
         totalBalance,
       },
-    });
+    })
   } catch (error) {
-    console.error("Error getting linked accounts:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error('Error getting linked accounts:', error)
+    res.status(500).json({ success: false, message: 'Server error' })
   }
-};
+}
 
 // Link a new account
 export const linkAccount = async (req, res) => {
   try {
-    const userId = req.user.sub;
-    const { type, provider, name, accountNumber, balance } = req.body;
+    const userId = req.user.sub
+    const { type, provider, name, accountNumber, balance } = req.body
 
     // Check if already linked
     const existing = await prisma.linkedAccount.findFirst({
       where: { userId, provider, isActive: true },
-    });
+    })
 
     if (existing) {
       return res.status(400).json({
         success: false,
-        message: "Account already linked",
-      });
+        message: 'Account already linked',
+      })
     }
 
     const linkedAccount = await prisma.linkedAccount.create({
@@ -365,24 +353,24 @@ export const linkAccount = async (req, res) => {
         accountNumber,
         balance: balance || 0,
       },
-    });
+    })
 
     res.status(201).json({
       success: true,
-      message: "Account linked successfully",
+      message: 'Account linked successfully',
       data: linkedAccount,
-    });
+    })
   } catch (error) {
-    console.error("Error linking account:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error('Error linking account:', error)
+    res.status(500).json({ success: false, message: 'Server error' })
   }
-};
+}
 
 // Update account balance
 export const updateAccountBalance = async (req, res) => {
   try {
-    const { accountId } = req.params;
-    const { balance } = req.body;
+    const { accountId } = req.params
+    const { balance } = req.body
 
     const account = await prisma.linkedAccount.update({
       where: { id: accountId },
@@ -390,72 +378,66 @@ export const updateAccountBalance = async (req, res) => {
         balance,
         lastSynced: new Date(),
       },
-    });
+    })
 
     res.json({
       success: true,
-      message: "Balance updated",
+      message: 'Balance updated',
       data: account,
-    });
+    })
   } catch (error) {
-    console.error("Error updating balance:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error('Error updating balance:', error)
+    res.status(500).json({ success: false, message: 'Server error' })
   }
-};
+}
 
 // Unlink an account
 export const unlinkAccount = async (req, res) => {
   try {
-    const { accountId } = req.params;
+    const { accountId } = req.params
 
     const account = await prisma.linkedAccount.update({
       where: { id: accountId },
       data: { isActive: false },
-    });
+    })
 
     res.json({
       success: true,
-      message: "Account unlinked successfully",
-    });
+      message: 'Account unlinked successfully',
+    })
   } catch (error) {
-    console.error("Error unlinking account:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error('Error unlinking account:', error)
+    res.status(500).json({ success: false, message: 'Server error' })
   }
-};
+}
 
 // Get account summary for dashboard
 export const getAccountSummary = async (req, res) => {
   try {
-    const userId = req.params.userId;
+    const userId = req.params.userId
     if (req.user.sub !== userId) {
       return res.status(403).json({
         success: false,
-        message: "Forbidden",
-      });
+        message: 'Forbidden',
+      })
     }
     if (req.user.sub !== userId) {
       return res.status(403).json({
         success: false,
-        message: "Forbidden",
-      });
+        message: 'Forbidden',
+      })
     }
 
     const accounts = await prisma.linkedAccount.findMany({
       where: { userId, isActive: true },
-    });
+    })
 
-    const banks = accounts.filter((a) => a.type === "bank");
-    const ewallets = accounts.filter((a) => a.type === "ewallet");
+    const banks = accounts.filter((a) => a.type === 'bank')
+    const ewallets = accounts.filter((a) => a.type === 'ewallet')
 
-    const totalBalance = accounts.reduce(
-      (sum, acc) => sum + (acc.balance || 0),
-      0,
-    );
-    const bankBalance = banks.reduce((sum, acc) => sum + (acc.balance || 0), 0);
-    const ewalletBalance = ewallets.reduce(
-      (sum, acc) => sum + (acc.balance || 0),
-      0,
-    );
+    const totalBalance = accounts.reduce((sum, acc) => sum + (acc.balance || 0), 0)
+    const bankBalance = banks.reduce((sum, acc) => sum + (acc.balance || 0), 0)
+    const ewalletBalance = ewallets.reduce((sum, acc) => sum + (acc.balance || 0), 0)
 
     res.json({
       success: true,
@@ -467,9 +449,9 @@ export const getAccountSummary = async (req, res) => {
         ewalletCount: ewallets.length,
         accounts,
       },
-    });
+    })
   } catch (error) {
-    console.error("Error getting account summary:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error('Error getting account summary:', error)
+    res.status(500).json({ success: false, message: 'Server error' })
   }
-};
+}
