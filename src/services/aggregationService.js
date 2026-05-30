@@ -1,11 +1,9 @@
-import prisma from "../lib/prisma.js";
-
-import { EXCLUDED_EXPENSE_CATEGORIES } from "../config/utils/constants.js";
+import prisma from '../lib/prisma.js'
 
 export async function calculateMonthlyAggregation(userId, year, month) {
-  const startDate = new Date(year, month - 1, 1);
-
-  const endDate = new Date(year, month, 0, 23, 59, 59);
+  const startDate = new Date(year, month - 1, 1)
+  const endDate = new Date(year, month, 0, 23, 59, 59, 999)
+  const monthYear = `${year}-${String(month).padStart(2, '0')}`
 
   const transactions = await prisma.transaction.findMany({
     where: {
@@ -15,112 +13,114 @@ export async function calculateMonthlyAggregation(userId, year, month) {
         lte: endDate,
       },
     },
-  });
+  })
 
-  const totalIncome = transactions
-    .filter((t) => t.transactionType === "credit")
-    .reduce((sum, t) => sum + t.amount, 0);
+  let totalIncome = 0
+  let totalExpense = 0
+  let expenseHousing = 0
+  let expenseFoodDrink = 0
+  let expenseTransportation = 0
+  let expenseEntertainment = 0
+  let expenseHealth = 0
+  let expenseEducation = 0
+  let expenseShopping = 0
+  let expenseBills = 0
+  let expenseInvestment = 0
+  let expenseOther = 0
 
-  const totalExpense = transactions
-    .filter(
-      (t) =>
-        t.transactionType === "debit" &&
-        !EXCLUDED_EXPENSE_CATEGORIES.includes(t.categoryLabel),
-    )
-    .reduce((sum, t) => sum + t.amount, 0);
+  for (const t of transactions) {
+    if (t.transactionType === 'credit') {
+      totalIncome += t.amount
+    } else if (t.transactionType === 'debit') {
+      // Exclude topup_ewallet and transfer_internal
+      if (t.categoryLabel !== 'topup_ewallet' && t.categoryLabel !== 'transfer_internal') {
+        totalExpense += t.amount
 
-  const savingsCapacity = totalIncome - totalExpense;
-
-  const expenseByCategory = {};
-
-  transactions
-    .filter((t) => t.transactionType === "debit" && t.categoryLabel)
-    .forEach((t) => {
-      if (!expenseByCategory[t.categoryLabel]) {
-        expenseByCategory[t.categoryLabel] = 0;
+        // Categorize
+        const cat = t.categoryLabel || 'lainnya'
+        if (cat === 'makanan' || cat === 'food') expenseFoodDrink += t.amount
+        else if (cat === 'transport' || cat === 'transportasi') expenseTransportation += t.amount
+        else if (cat === 'hiburan' || cat === 'entertainment') expenseEntertainment += t.amount
+        else if (cat === 'belanja' || cat === 'shopping') expenseShopping += t.amount
+        else if (cat === 'tagihan' || cat === 'bills') expenseBills += t.amount
+        else if (cat === 'kesehatan' || cat === 'health') expenseHealth += t.amount
+        else if (cat === 'pendidikan' || cat === 'education') expenseEducation += t.amount
+        else if (cat === 'perumahan' || cat === 'housing') expenseHousing += t.amount
+        else if (cat === 'investasi' || cat === 'investment') expenseInvestment += t.amount
+        else expenseOther += t.amount
       }
+    }
+  }
 
-      expenseByCategory[t.categoryLabel] += t.amount;
-    });
+  const savingsCapacity = totalIncome - totalExpense
+  const expenseToIncomeRatio = totalIncome > 0 ? totalExpense / totalIncome : 0
+  const savingsRate = totalIncome > 0 ? savingsCapacity / totalIncome : 0
 
-  // previous month
-  const prevDate = new Date(year, month - 2, 1);
-
-  const prevMonthYear = `${prevDate.getFullYear()}-${String(
-    prevDate.getMonth() + 1,
-  ).padStart(2, "0")}`;
-
-  const previousAgg = await prisma.aggregation.findFirst({
-    where: {
-      userId,
-      monthYear: prevMonthYear,
-    },
-  });
-
-  const previousBalance = previousAgg?.currentTotalBalance || 0;
-
-  const currentTotalBalance = previousBalance + savingsCapacity;
-
-  const monthYear = `${year}-${String(month).padStart(2, "0")}`;
-
-  const aggregation = await prisma.aggregation.upsert({
+  // Upsert aggregation
+  const agg = await prisma.aggregation.upsert({
     where: {
       userId_monthYear: {
         userId,
         monthYear,
       },
     },
-
     update: {
       totalIncome,
       totalExpense,
+      expenseHousing,
+      expenseFoodDrink,
+      expenseTransportation,
+      expenseEntertainment,
+      expenseHealth,
+      expenseEducation,
+      expenseShopping,
+      expenseBills,
+      expenseInvestment,
+      expenseOther,
       savingsCapacity,
-      currentTotalBalance,
+      expenseToIncomeRatio,
+      savingsRate,
       transactionCount: transactions.length,
-      expenseHousing: expenseByCategory["perumahan"] || 0,
-      expenseFoodDrink: expenseByCategory["makanan"] || 0,
-      expenseTransportation: expenseByCategory["transport"] || 0,
-      expenseEntertainment: expenseByCategory["hiburan"] || 0,
-      expenseHealth: expenseByCategory["kesehatan"] || 0,
-      expenseEducation: expenseByCategory["pendidikan"] || 0,
-      expenseShopping: expenseByCategory["belanja"] || 0,
-      expenseBills: expenseByCategory["tagihan"] || 0,
-      expenseInvestment: expenseByCategory["investasi"] || 0,
-      expenseOther:
-        (expenseByCategory["lainnya"] || 0) +
-        (expenseByCategory["tidak_diketahui"] || 0) +
-        (expenseByCategory["topup_ewallet"] || 0) +
-        (expenseByCategory["transfer_internal"] || 0) +
-        (expenseByCategory["transfer_keluarga"] || 0) +
-        (expenseByCategory["transfer_sosial"] || 0),
     },
-
     create: {
       userId,
       monthYear,
       totalIncome,
       totalExpense,
+      expenseHousing,
+      expenseFoodDrink,
+      expenseTransportation,
+      expenseEntertainment,
+      expenseHealth,
+      expenseEducation,
+      expenseShopping,
+      expenseBills,
+      expenseInvestment,
+      expenseOther,
       savingsCapacity,
-      currentTotalBalance,
+      expenseToIncomeRatio,
+      savingsRate,
       transactionCount: transactions.length,
-      expenseHousing: expenseByCategory["perumahan"] || 0,
-      expenseFoodDrink: expenseByCategory["makanan"] || 0,
-      expenseTransportation: expenseByCategory["transport"] || 0,
-      expenseEntertainment: expenseByCategory["hiburan"] || 0,
-      expenseHealth: expenseByCategory["kesehatan"] || 0,
-      expenseEducation: expenseByCategory["pendidikan"] || 0,
-      expenseShopping: expenseByCategory["belanja"] || 0,
-      expenseBills: expenseByCategory["tagihan"] || 0,
-      expenseInvestment: expenseByCategory["investasi"] || 0,
-      expenseOther:
-        (expenseByCategory["lainnya"] || 0) +
-        (expenseByCategory["tidak_diketahui"] || 0) +
-        (expenseByCategory["topup_ewallet"] || 0) +
-        (expenseByCategory["transfer_internal"] || 0) +
-        (expenseByCategory["transfer_keluarga"] || 0) +
-        (expenseByCategory["transfer_sosial"] || 0),
+      currentTotalBalance: 0, // This should be updated sequentially if needed
     },
-  });
+  })
 
-  return aggregation;
+  // Calculate currentTotalBalance across all aggregations
+  const allAggs = await prisma.aggregation.findMany({
+    where: { userId },
+    orderBy: { monthYear: 'asc' },
+  })
+
+  let currentBalance = 0
+  for (const a of allAggs) {
+    currentBalance += a.savingsCapacity
+    if (a.id === agg.id && a.currentTotalBalance !== currentBalance) {
+      await prisma.aggregation.update({
+        where: { id: a.id },
+        data: { currentTotalBalance: currentBalance },
+      })
+    }
+  }
+
+  return agg
 }

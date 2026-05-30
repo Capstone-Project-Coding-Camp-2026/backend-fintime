@@ -21,6 +21,9 @@ model User {
   birthDate        DateTime?
   phone            String?
   monthlyIncome    Float?
+  monthlyExpenses  Float? @default(0)
+  currentSavings   Float? @default(0)
+
   retirementAge    Int?
   avatarCondition AvatarCondition @default(normal)
 
@@ -178,7 +181,7 @@ model Learning {
 
 // categoryLabel  {
 //perumahan
-//makanan_minuman
+//makanan
 //transportasi
 //hiburan
 //kesehatan

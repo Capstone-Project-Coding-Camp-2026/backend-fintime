@@ -1,174 +1,207 @@
-// import * as tf from "@tensorflow/tfjs";
-// import fs from "fs";
-// import path from "path";
+/**
+ * Mengimplementasikan 4 layer klasifikasi
+ * Layer 1: Rule-based keyword matching (langsung, tanpa AI)
+ * Layer 2: NLP via AI API (FastAPI /predict/classify)
+ * Layer 3: Fallback ke 'lainnya' jika confidence < 0.7
+ * Layer 4: Re-labelling oleh user (di frontend)
+ */
+import { classifyTransactionAI } from './aiApiService.js'
+import { TRANSACTION_CATEGORIES, NON_EXPENSE_CATEGORIES } from '../constants/transactionCategories.js'
 
-// let classifyModel = null;
-// let tokenizer = null;
-// let inferenceConfig = null;
-// let labelMap = null;
+const CONFIDENCE_THRESHOLD = 0.7
+const FALLBACK_LABEL = 'lainnya'
 
-// // Paths (using relative paths from project root)
-// const tokenizerPath = "./src/models/tfjs/classify/tokenizer.json";
-// const configPath = "./src/models/tfjs/classify/inference_config.json";
-// const labelsPath = "./src/models/tfjs/classify/labels.json";
+// Layer 1 — Rule-based keyword matching 
+const KEYWORD_RULES = {
+  // Topup e-wallet
+  topup_ewallet: [
+    'TRANSFER KE GOPAY', 'TOP UP OVO', 'TRF KE DANA', 'TOPUP GOPAY',
+    'TOP UP GOPAY', 'TRANSFER KE OVO', 'TRANSFER KE DANA', 'ISI SALDO GOPAY',
+    'ISI SALDO OVO', 'TRANSFER KE SHOPEEPAY', 'TOPUP OVO', 'TOPUP DANA',
+    'TRF GOPAY', 'TRF OVO', 'TRF DANA', 'LINKAJA', 'SHOPEEPAY TOP',
+  ],
+  // Transfer internal
+  transfer_internal: [
+    'TRANSFER KE REKENING SENDIRI', 'TRF ANTAR REKENING', 'PINDAH DANA',
+    'SETORAN TUNAI', 'SETOR TUNAI',
+  ],
+  // Makanan
+  makanan: [
+    'MCDONALD', 'MCDONALDS', 'KFC', 'GRABFOOD', 'GOFOOD', 'SHOPEEFOOD',
+    'RESTORAN', 'WARUNG', 'KOPI', 'CAFE', 'COFFEE', 'PIZZA', 'BURGER',
+    'STARBUCKS', 'BAKSO', 'MIE AYAM', 'INDOMIE', 'NASI', 'AYAM',
+    'SEAFOOD', 'CATERING', 'FOOD', 'MAKAN', 'MINUMAN', 'DRINK',
+    'HOKBEN', 'RICHEESE', 'JOLLIBEE', 'DOMINOS', 'SUBWAY', 'A&W',
+  ],
+  // Transport
+  transport: [
+    'GRAB', 'GOJEK', 'PERTAMINA', 'KRL', 'MRT', 'TRAVELOKA', 'PARKIR',
+    'TOL', 'TIKET KERETA', 'TIKET PESAWAT', 'TRANSJAKARTA', 'OJOL',
+    'TAXI', 'BENSIN', 'SPBU', 'SHELL', 'VIVO', 'COMMUTER', 'LRT',
+    'DAMRI', 'BUS', 'AIRPORT', 'BANDARA', 'TERMINAL',
+  ],
+  // Hiburan
+  hiburan: [
+    'NETFLIX', 'SPOTIFY', 'BIOSKOP', 'XXI', 'CGV', 'STEAM', 'GYM',
+    'KARAOKE', 'YOUTUBE PREMIUM', 'DISNEY', 'VIDIO', 'MOLA', 'MAIN',
+    'GAME', 'PLAYSTATION', 'XBOX', 'DOTA', 'MOBILE LEGEND', 'FITNESS',
+    'KOLAM RENANG', 'BILYAR', 'BOWLING', 'ESCAPE ROOM',
+  ],
+  // Belanja
+  belanja: [
+    'SHOPEE', 'TOKOPEDIA', 'LAZADA', 'BUKALAPAK', 'UNIQLO', 'INDOMARET',
+    'ALFAMART', 'MALL', 'CARREFOUR', 'HYPERMART', 'SUPERMARKET', 'MINIMARKET',
+    'BLIBLI', 'ZALORA', 'H&M', 'ZARA', 'IKEA', 'ACE HARDWARE',
+  ],
+  // Tagihan
+  tagihan: [
+    'PLN', 'TELKOMSEL', 'INDIHOME', 'BPJS', 'PDAM', 'IURAN RT',
+    'TAGIHAN', 'BAYAR LISTRIK', 'BAYAR AIR', 'BAYAR INTERNET',
+    'PASCAL', 'SPEEDY', 'BIZNET', 'FIRST MEDIA', 'MYREPUBLIC',
+    'AXIS', 'XL', 'SIMPATI', 'AS', 'TELKOM', 'BOLT', 'SMARTFREN',
+  ],
+  // Kesehatan
+  kesehatan: [
+    'APOTEK', 'APOTIK', 'K24', 'HALODOC', 'RUMAH SAKIT', 'RS ', 'KLINIK',
+    'GUARDIAN', 'DOKTER', 'OBAT', 'LAB', 'LABORATORIUM', 'WATSONS',
+    'CENTURY', 'KIMIA FARMA', 'ALODOKTER', 'SEHATQ',
+  ],
+  // Pendidikan
+  pendidikan: [
+    'RUANGGURU', 'COURSERA', 'UDEMY', 'UANG KULIAH', 'SPP', 'BIMBEL',
+    'BIMBINGAN BELAJAR', 'SEKOLAH', 'KAMPUS', 'UNIVERSITAS', 'INSTITUTE',
+    'SMARTNATION', 'SKILL ACADEMY', 'DICODING', 'HACKTIV', 'PURWADHIKA',
+  ],
+}
 
-// export function initNlpService(model) {
-//   classifyModel = model;
+/**
+ * Layer 1: Rule-based keyword matching
+ */
+function keywordMatch(description) {
+  const textUpper = description.toUpperCase()
 
-//   // Load configuration files
-//   if (fs.existsSync(tokenizerPath)) {
-//     tokenizer = JSON.parse(fs.readFileSync(tokenizerPath, "utf8"));
-//   } else {
-//     console.error("Tokenizer config file not found:", tokenizerPath);
-//   }
+  for (const [category, keywords] of Object.entries(KEYWORD_RULES)) {
+    for (const kw of keywords) {
+      if (textUpper.includes(kw)) {
+        return {
+          category,
+          confidence: 1.0,
+          source: 'keyword',
+        }
+      }
+    }
+  }
 
-//   if (fs.existsSync(configPath)) {
-//     inferenceConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
-//   } else {
-//     console.error("Inference config file not found:", configPath);
-//   }
+  return null
+}
 
-//   if (fs.existsSync(labelsPath)) {
-//     labelMap = JSON.parse(fs.readFileSync(labelsPath, "utf8"));
-//   } else {
-//     console.error("Labels map file not found:", labelsPath);
-//   }
-// }
+// Fungsi utama: classifyDescription
+// Menjalankan Layer 1 → Layer 2 → Layer 3
 
-// /**
-//  * Normalizes input text and extracts character n-grams.
-//  */
-// function extractNgrams(text, minLen = 2, maxLen = 5) {
-//   // Lowercase, collapse whitespace, trim
-//   const normalized = text.toLowerCase().replace(/\s+/g, " ").trim();
-//   const ngrams = [];
+/**
+ * Klasifikasi deskripsi transaksi
+ * @param {string} description
+ * @returns {{ category: string, confidence: number, source: string, isLabelled: boolean }}
+ */
+export async function classifyDescription(description) {
+  if (!description || typeof description !== 'string') {
+    return {
+      category: FALLBACK_LABEL,
+      confidence: 0,
+      source: 'fallback',
+      isLabelled: false,
+    }
+  }
 
-//   for (let len = minLen; len <= maxLen; len++) {
-//     for (let i = 0; i <= normalized.length - len; i++) {
-//       ngrams.push(normalized.substring(i, i + len));
-//     }
-//   }
-//   return ngrams;
-// }
+  // Layer 1: Keyword matching
+  const keywordResult = keywordMatch(description)
+  if (keywordResult) {
+    return {
+      ...keywordResult,
+      isLabelled: true,
+    }
+  }
 
-// /**
-//  * Vectorizes raw text using TF-L2 representation based on tokenizer vocabulary.
-//  */
-// export function vectorize(text) {
-//   if (!tokenizer) {
-//     throw new Error("NLP Service not initialized. Tokenizer not loaded.");
-//   }
+  // Layer 2: AI API (FastAPI)
+  try {
+    const aiResult = await classifyTransactionAI(description)
 
-//   const vocab = tokenizer.word_index;
-//   const inputDim = tokenizer.input_dim || 22454;
-//   const minLen = tokenizer.ngram_min || 2;
-//   const maxLen = tokenizer.ngram_max || 5;
+    if (aiResult.success && aiResult.predicted_category) {
+      const confidence = aiResult.confidence ?? 0
+      const category = aiResult.predicted_category
 
-//   const ngrams = extractNgrams(text, minLen, maxLen);
+      // Layer 3: Fallback jika confidence < threshold
+      if (confidence < CONFIDENCE_THRESHOLD || category === FALLBACK_LABEL) {
+        return {
+          category: FALLBACK_LABEL,
+          confidence,
+          source: 'fallback',
+          isLabelled: false, // perlu re-label oleh user
+        }
+      }
 
-//   // Count frequency of each n-gram
-//   const counts = {};
-//   for (const ngram of ngrams) {
-//     if (vocab.hasOwnProperty(ngram)) {
-//       const idx = vocab[ngram];
-//       counts[idx] = (counts[idx] || 0) + 1;
-//     }
-//   }
+      return {
+        category,
+        confidence,
+        source: 'ai_api',
+        isLabelled: true,
+      }
+    }
+  } catch (err) {
+    console.warn('[NLP] AI API gagal, fallback ke lainnya:', err.message)
+  }
 
-//   // Calculate sublinear TF: 1 + ln(count) for count > 0
-//   const values = {};
-//   let sumOfSquares = 0;
-//   for (const idx in counts) {
-//     const count = counts[idx];
-//     const tfVal = 1 + Math.log(count);
-//     values[idx] = tfVal;
-//     sumOfSquares += tfVal * tfVal;
-//   }
+  // Layer 3: Fallback
+  return {
+    category: FALLBACK_LABEL,
+    confidence: 0,
+    source: 'fallback',
+    isLabelled: false,
+  }
+}
 
-//   // L2 Normalization
-//   const norm = Math.sqrt(sumOfSquares);
-//   const vector = new Float32Array(inputDim);
-//   if (norm > 0) {
-//     for (const idx in values) {
-//       vector[parseInt(idx)] = values[idx] / norm;
-//     }
-//   }
+/**
+ * Cek apakah deskripsi cocok dengan label_rules user
+ * @param {string} description
+ * @param {Array} labelRules - Array rule dari User.labelRules: [{match, category}]
+ * @returns {{ category: string, confidence: number, source: string } | null}
+ */
+export function applyLabelRules(description, labelRules) {
+  if (!Array.isArray(labelRules) || labelRules.length === 0) return null
+  if (!description) return null
 
-//   return tf.tensor2d([vector], [1, inputDim]);
-// }
+  const textLower = description.toLowerCase().trim()
 
-// /**
-//  * Classifies a single transaction description.
-//  */
-// export async function classifyTransaction(description) {
-//   if (!inferenceConfig || !labelMap) {
-//     throw new Error("NLP Service not initialized. Configs not loaded.");
-//   }
+  for (const rule of labelRules) {
+    if (rule.match && textLower.includes(rule.match.toLowerCase())) {
+      return {
+        category: rule.category,
+        confidence: 1.0,
+        source: 'label_rule',
+        isLabelled: true,
+      }
+    }
+  }
 
-//   const keywordRules = inferenceConfig.keyword_rules || {};
-//   const threshold = inferenceConfig.confidence_threshold || 0.7;
-//   const fallbackLabel = inferenceConfig.fallback_label || "lainnya";
+  return null
+}
 
-//   const textUpper = description.toUpperCase();
+/**
+ * Proses utama klasifikasi
+ * 1. Cek label_rules user
+ * 2. Jika tidak cocok → NLP (Layer 1 → 2 → 3)
+ * @param {string} description
+ * @param {Array} labelRules - label_rules milik user
+ */
+export async function classifyWithRules(description, labelRules = []) {
+  // Step 1: Cek label_rules user
+  const ruleResult = applyLabelRules(description, labelRules)
+  if (ruleResult) {
+    return ruleResult
+  }
 
-//   // Layer 1: Rule-based Keyword Matching
-//   for (const [category, keywords] of Object.entries(keywordRules)) {
-//     for (const kw of keywords) {
-//       if (textUpper.includes(kw)) {
-//         return {
-//           category: category,
-//           confidence: 1.0,
-//           source: "keyword",
-//         };
-//       }
-//     }
-//   }
+  // Step 2: Jalankan NLP (Layer 1 → 2 → 3)
+  return await classifyDescription(description)
+}
 
-//   // Layer 2: Model Prediction
-//   if (!classifyModel) {
-//     // If model is not loaded yet, return fallback
-//     return {
-//       category: fallbackLabel,
-//       confidence: 0.0,
-//       source: "fallback",
-//     };
-//   }
-
-//   let inputTensor = null;
-//   let prediction = null;
-//   try {
-//     inputTensor = vectorize(description);
-//     prediction = classifyModel.predict(inputTensor);
-//     const probabilities = await prediction.array();
-//     const probRow = probabilities[0];
-
-//     const maxConfidence = Math.max(...probRow);
-//     const classIdx = probRow.indexOf(maxConfidence);
-//     let category = labelMap.idx2label[classIdx] || fallbackLabel;
-
-//     // Layer 3: Fallback if confidence < threshold
-//     if (maxConfidence < threshold) {
-//       return {
-//         category: fallbackLabel,
-//         confidence: maxConfidence,
-//         source: "fallback",
-//       };
-//     }
-
-//     return {
-//       category: category,
-//       confidence: maxConfidence,
-//       source: "model",
-//     };
-//   } catch (error) {
-//     console.error("Error during model prediction:", error);
-//     return {
-//       category: fallbackLabel,
-//       confidence: 0.0,
-//       source: "fallback",
-//     };
-//   } finally {
-//     if (inputTensor) inputTensor.dispose();
-//     if (prediction) prediction.dispose();
-//   }
-// }
+export { TRANSACTION_CATEGORIES, NON_EXPENSE_CATEGORIES, CONFIDENCE_THRESHOLD, FALLBACK_LABEL }

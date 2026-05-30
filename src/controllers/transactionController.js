@@ -1,6 +1,8 @@
 // Transaction & LinkedAccount Controller - Prisma
 import prisma from "../lib/prisma.js";
 import { classifyTransactionAI } from "../services/aiApiService.js";
+import { classifyWithRules } from "../services/nlpService.js";
+
 export const getTransactions = async (req, res) => {
   try {
     const userId = req.params.userId;
@@ -178,56 +180,48 @@ export const createTransaction = async (req, res) => {
       amount,
       transactionType,
       paymentMethod,
-      categoryLabel,
+      categoryLabel: manualCategoryLabel,
     } = req.body;
 
-    // =========================================
-    // AI Classification
-    // =========================================
+    // Ambil label_rules user
+    const user = await prisma.user.findUnique({
+      where: { id: userIdFromToken },
+      select: { labelRules: true },
+    });
+    const labelRules = Array.isArray(user?.labelRules) ? user.labelRules : [];
 
-    let predictedCategory = "lainnya";
-    let confidence = 0;
+    // Klasifikasi: label_rules kemudian  NLP (AI API) lalu fallback
+    let predictedCategory = manualCategoryLabel || "lainnya";
+    let confidence = manualCategoryLabel ? 1.0 : 0;
+    let isLabelled = !!manualCategoryLabel;
 
-    try {
-      // hit deployed AI API
-      const aiResult = await classifyTransactionAI(description);
-
-      predictedCategory = aiResult.predicted_category || "lainnya";
-
-      confidence = aiResult.confidence || 0;
-
-      console.log("AI Result:", aiResult);
-    } catch (aiError) {
-      console.error("AI classification failed:", aiError.message);
-
-      // fallback kalau AI mati
-      predictedCategory = "lainnya";
-      confidence = 0;
+    if (!manualCategoryLabel || manualCategoryLabel === "lainnya") {
+      try {
+        const result = await classifyWithRules(description, labelRules);
+        predictedCategory = result.category;
+        confidence = result.confidence;
+        isLabelled = result.isLabelled;
+      } catch (aiError) {
+        console.error("[createTransaction] Classification failed:", aiError.message);
+        predictedCategory = "lainnya";
+        confidence = 0;
+        isLabelled = false;
+      }
     }
 
     // =========================================
     // Save transaction
     // =========================================
-
     const transaction = await prisma.transaction.create({
       data: {
         userId: userIdFromToken,
         dateTime: dateTime ? new Date(dateTime) : new Date(),
-
         description,
         amount,
         transactionType,
-
         paymentMethod: paymentMethod || "tunai",
-
-        // manual override kalau frontend ngirim (jika 'lainnya' atau kosong, gunakan prediksi AI)
-        categoryLabel:
-          categoryLabel && categoryLabel !== "lainnya"
-            ? categoryLabel
-            : predictedCategory,
-
-        isLabelled: true,
-
+        categoryLabel: predictedCategory,
+        isLabelled,
         confidence,
       },
     });

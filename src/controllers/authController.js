@@ -506,3 +506,58 @@ export async function updateProfile(req, res, next) {
     next(e);
   }
 }
+
+// VERIFY OTP POST /api/auth/verify-otp
+// Mock implementation: OTP selalu valid (simulasi untuk demo)
+// Untuk production: simpan OTP di DB/Redis dengan TTL lalu validasi di sini
+export async function verifyOtp(req, res, next) {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Email dan OTP diperlukan",
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User tidak ditemukan",
+      });
+    }
+
+    // Mock: OTP "000000" selalu valid untuk testing, atau OTP 6 digit apapun diterima
+    // Untuk production: validasi OTP dari storage (Redis/DB)
+    const isValidOtp = otp === "000000" || /^\d{6}$/.test(otp);
+
+    if (!isValidOtp) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP tidak valid",
+      });
+    }
+
+    const token = signToken(user.id);
+    const { password: _, ...safeUser } = user;
+
+    res.json({
+      success: true,
+      message: "OTP verified successfully",
+      data: {
+        user: {
+          ...safeUser,
+          occupation: mapJobTypeToOccupation(safeUser.jobType),
+        },
+        token,
+      },
+    });
+  } catch (e) {
+    next(e);
+  }
+}

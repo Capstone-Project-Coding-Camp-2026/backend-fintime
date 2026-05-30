@@ -19,6 +19,10 @@ export async function importMockTransactions(userId, transactions) {
       categoryLabel = aiResult?.predicted_category || "lainnya";
 
       confidence = aiResult?.confidence || 0;
+
+      if (confidence < 0.7) {
+        categoryLabel = "lainnya";
+      }
     } catch (err) {
       console.error("AI classify failed:", err.message);
     }
