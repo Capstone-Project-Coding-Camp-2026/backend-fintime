@@ -37,6 +37,10 @@ export async function importMockTransactions(userId, transactions) {
       categoryLabel = aiResult?.predicted_category || "lainnya";
 
       confidence = aiResult?.confidence || 0;
+
+      if (confidence < 0.7) {
+        categoryLabel = "lainnya";
+      }
     } catch (err) {
       console.error("AI classify failed:", err.message);
     }
@@ -68,6 +72,28 @@ export async function importMockTransactions(userId, transactions) {
         isLabelled: categoryLabel !== "lainnya",
       },
     });
+
+    // Update budget spent if applicable
+    if (categoryLabel !== "lainnya" && trx.transactionType === "debit") {
+      const budget = await prisma.budget.findFirst({
+        where: {
+          userId,
+          category: {
+            equals: categoryLabel,
+            mode: "insensitive",
+          },
+          period: "monthly",
+          isActive: true,
+        },
+      });
+
+      if (budget) {
+        await prisma.budget.update({
+          where: { id: budget.id },
+          data: { spent: { increment: trx.amount } },
+        });
+      }
+    }
 
     savedTransactions.push(saved);
   }

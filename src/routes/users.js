@@ -1,8 +1,10 @@
 import express from 'express'
-import authMiddleware from '../middleware/auth.js'
+import { authMiddleware } from '../middleware/auth.js'
 import prisma from '../lib/prisma.js'
-import { validCategories } from './transactions.js'
+import { TRANSACTION_CATEGORIES } from '../constants/transactionCategories.js'
+
 const router = express.Router()
+
 // GET /api/users/:userId/label-rules
 router.get('/:userId/label-rules', authMiddleware, async (req, res) => {
   try {
@@ -36,7 +38,7 @@ router.put('/:userId/label-rules', authMiddleware, async (req, res) => {
         message: 'description and categoryLabel are required',
       })
     }
-    if (!validCategories.includes(categoryLabel)) {
+    if (!TRANSACTION_CATEGORIES.includes(categoryLabel)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid category label',
