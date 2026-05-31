@@ -21,10 +21,14 @@ model User {
   birthDate        DateTime?
   phone            String?
   monthlyIncome    Float?
+  monthlyExpenses  Float? @default(0)
+  currentSavings   Float? @default(0)
+
   retirementAge    Int?
   avatarCondition AvatarCondition @default(normal)
 
   jobType JobType?
+  cityTier String? @default("tier_2")
 
   // Auto-label rules: [{match, category, include_expense}]
   labelRules        Json   @default("[]")
@@ -178,7 +182,7 @@ model Learning {
 
 // categoryLabel  {
 //perumahan
-//makanan_minuman
+//makanan
 //transportasi
 //hiburan
 //kesehatan

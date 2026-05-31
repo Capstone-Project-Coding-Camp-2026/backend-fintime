@@ -1,22 +1,34 @@
 export const buildWhatIfPayload = ({
-  user,
-  totalBalance,
-  monthlyIncome,
-  monthlyExpense,
+  profile,
   selectedOption,
   installmentMonths,
   interestRate,
   itemPrice,
 }) => {
+  const {
+    userProfile: user,
+    totalBalance,
+    monthlyIncome,
+    monthlyExpenses,
+    debtMetrics,
+    emergencyFund,
+    impulseSpendingTendency,
+    savingsRate,
+    financialLiteracyScore,
+    budgetingScore,
+    investmentScore,
+    planningScore,
+  } = profile;
+
   // Calculate age safely
-  let userAge = 25; // default
+  let userAge = 25 // default
   if (user.birthDate) {
-    const birth = new Date(user.birthDate);
-    const today = new Date();
-    userAge = today.getFullYear() - birth.getFullYear();
-    const m = today.getMonth() - birth.getMonth();
+    const birth = new Date(user.birthDate)
+    const today = new Date()
+    userAge = today.getFullYear() - birth.getFullYear()
+    const m = today.getMonth() - birth.getMonth()
     if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
-      userAge--;
+      userAge--
     }
   }
 
@@ -24,47 +36,37 @@ export const buildWhatIfPayload = ({
     user_profile: {
       age: userAge,
       total_income: monthlyIncome,
-      monthly_expenses: monthlyExpense,
+      monthly_expenses: Math.round(monthlyExpenses),
       current_savings: totalBalance,
 
-      has_emergency_fund: totalBalance >= monthlyExpense * 3 ? 1 : 0,
+      has_emergency_fund: emergencyFund.hasEmergencyFund,
+      emergency_fund_months: Math.round(emergencyFund.emergencyFundMonths),
 
-      emergency_fund_months:
-        monthlyExpense > 0 ? Math.round(totalBalance / monthlyExpense) : 0,
+      has_kpr: debtMetrics.hasKpr,
+      has_vehicle_credit: debtMetrics.hasVehicleCredit,
+      pinjol_active: debtMetrics.pinjolActive,
+      total_debt: debtMetrics.totalDebt,
+      debt_to_income_ratio: debtMetrics.debtToIncomeRatio,
 
-      has_kpr: 0,
-      has_vehicle_credit: 0,
-      pinjol_active: 0,
-      total_debt: 0,
+      credit_card_utilization: debtMetrics.creditCardUtilization,
+      financial_literacy_score: financialLiteracyScore,
 
-      credit_card_utilization: 0.2,
-      financial_literacy_score: 70,
+      employment_type: user.jobType || 'permanent',
+      city_tier: user.cityTier || 'tier_2',
 
-      employment_type: "full_time",
-      city_tier: "tier_2",
+      // Hitung history berdasarkan aktifnya hutang/pinjol
+      paylater_usage_history: debtMetrics.pinjolActive ? 'high' : (selectedOption === 'paylater' ? 'medium' : 'low'),
 
-      paylater_usage_history: selectedOption === "paylater" ? "medium" : "low",
+      impulse_spending_tendency: impulseSpendingTendency,
 
-      impulse_spending_tendency: "medium",
-
-      savings_rate:
-        monthlyIncome > 0
-          ? Number(
-              ((monthlyIncome - monthlyExpense) / monthlyIncome).toFixed(2),
-            )
-          : 0,
+      savings_rate: savingsRate,
     },
 
     simulation: {
       item_price: itemPrice,
-
       available_cash: totalBalance,
-
-      paylater_interest_rate:
-        selectedOption === "paylater" ? parseFloat(interestRate) / 100 : 0,
-
-      paylater_tenor_months:
-        selectedOption === "paylater" ? parseInt(installmentMonths) : 1,
+      paylater_interest_rate: selectedOption === 'paylater' ? Math.round(parseFloat(interestRate)) : 0,
+      paylater_tenor_months: selectedOption === 'paylater' ? Math.round(parseFloat(installmentMonths)) : 1,
     },
-  };
-};
+  }
+}
