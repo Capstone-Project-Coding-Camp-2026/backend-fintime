@@ -1,7 +1,7 @@
-import express from 'express'
+﻿import express from 'express'
 import { authMiddleware } from '../middleware/auth.js'
 import prisma from '../lib/prisma.js'
-import { createTransaction } from '../controllers/transactionController.js'
+import { createTransaction, updateBudgetSpent } from '../controllers/transactionController.js'
 import { EXCLUDED_EXPENSE_CATEGORIES } from '../config/utils/constants.js'
 import { TRANSACTION_CATEGORIES } from '../constants/transactionCategories.js'
 import { calculateMonthlyAggregation } from '../services/aggregationService.js'
@@ -130,6 +130,12 @@ router.put('/:transactionId/relabel', authMiddleware, async (req, res) => {
         message: 'Invalid category label',
       })
     }
+
+    const oldTransaction = await prisma.transaction.findUnique({ where: { id: transactionId } })
+    if (!oldTransaction) {
+      return res.status(404).json({ success: false, message: 'Transaction not found' })
+    }
+
     // 1. Update transaksi
     const transaction = await prisma.transaction.update({
       where: { id: transactionId },
@@ -139,6 +145,16 @@ router.put('/:transactionId/relabel', authMiddleware, async (req, res) => {
         confidence: 1.0,
       },
     })
+
+    if (oldTransaction.transactionType === 'debit' && oldTransaction.categoryLabel !== categoryLabel) {
+      if (oldTransaction.categoryLabel && oldTransaction.categoryLabel !== 'unlabelled') {
+        await updateBudgetSpent(oldTransaction.userId, oldTransaction.categoryLabel, -oldTransaction.amount)
+      }
+      if (categoryLabel && categoryLabel !== 'unlabelled') {
+        await updateBudgetSpent(oldTransaction.userId, categoryLabel, oldTransaction.amount)
+      }
+    }
+
     // 2. Simpan label rule ke User.labelRules
     const matchKey = (transaction.description || '').toLowerCase().replace(/\s+\d+$/, '').trim()
     let autoRelabelledCount = 0
@@ -180,6 +196,18 @@ router.put('/:transactionId/relabel', authMiddleware, async (req, res) => {
               isLabelled: true,
             },
           })
+
+          for (const tx of matchingTx) {
+            if (tx.transactionType === 'debit' && tx.categoryLabel !== categoryLabel) {
+              if (tx.categoryLabel && tx.categoryLabel !== 'unlabelled') {
+                await updateBudgetSpent(tx.userId, tx.categoryLabel, -tx.amount)
+              }
+              if (categoryLabel && categoryLabel !== 'unlabelled') {
+                await updateBudgetSpent(tx.userId, categoryLabel, tx.amount)
+              }
+            }
+          }
+
           autoRelabelledCount = result.count
         }
       }
@@ -221,6 +249,11 @@ router.put('/relabel-batch', authMiddleware, async (req, res) => {
         message: 'transactionIds must be a non-empty array',
       })
     }
+
+    const oldTransactions = await prisma.transaction.findMany({
+      where: { id: { in: transactionIds } }
+    })
+
     const result = await prisma.transaction.updateMany({
       where: { id: { in: transactionIds } },
       data: {
@@ -229,6 +262,18 @@ router.put('/relabel-batch', authMiddleware, async (req, res) => {
         confidence: 1.0,
       },
     })
+
+    for (const oldTx of oldTransactions) {
+      if (oldTx.transactionType === 'debit' && oldTx.categoryLabel !== categoryLabel) {
+        if (oldTx.categoryLabel && oldTx.categoryLabel !== 'unlabelled') {
+          await updateBudgetSpent(oldTx.userId, oldTx.categoryLabel, -oldTx.amount)
+        }
+        if (categoryLabel && categoryLabel !== 'unlabelled') {
+          await updateBudgetSpent(oldTx.userId, categoryLabel, oldTx.amount)
+        }
+      }
+    }
+
     // Simpan label rule ke semua user yang transaksi
     const affectedTransactions = await prisma.transaction.findMany({
       where: { id: { in: transactionIds } },
@@ -264,7 +309,7 @@ router.put('/relabel-batch', authMiddleware, async (req, res) => {
   }
 })
 // POST /api/transactions/sync
-// Sync dari Mock API + NLP + cek label_rules → aggregation → forecast → avatar
+// Sync dari Mock API + NLP + cek label_rules â†’ aggregation â†’ forecast â†’ avatar
 router.post('/sync', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.sub
@@ -276,11 +321,11 @@ router.post('/sync', authMiddleware, async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' })
     }
     // Jalankan full pipeline di background (non-blocking):
-    // Mock API → cek label_rules → NLP → aggregation → forecast → avatar
+    // Mock API â†’ cek label_rules â†’ NLP â†’ aggregation â†’ forecast â†’ avatar
     runAsyncMockBuilder(userId, user.monthlyIncome, user.jobType, user.linkedAccounts)
     res.json({
       success: true,
-      message: 'Sync started. Transaksi sedang diproses di background (NLP → aggregation → forecast → avatar).',
+      message: 'Sync started. Transaksi sedang diproses di background (NLP â†’ aggregation â†’ forecast â†’ avatar).',
       status: 'processing',
     })
   } catch (error) {

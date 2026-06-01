@@ -23,6 +23,20 @@ export const createBudget = async (req, res) => {
 
     const budgetPeriod = period || 'monthly'
 
+    const now = new Date()
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+
+    const existingTxs = await prisma.transaction.findMany({
+      where: {
+        userId,
+        categoryLabel: category,
+        transactionType: 'debit',
+        dateTime: { gte: startOfMonth, lte: endOfMonth }
+      }
+    })
+    const initialSpent = existingTxs.reduce((sum, t) => sum + t.amount, 0)
+
     // Check if budget already exists
     const existing = await prisma.budget.findFirst({
       where: { userId, category, period: budgetPeriod }
@@ -33,7 +47,7 @@ export const createBudget = async (req, res) => {
       if (!existing.isActive) {
         const budget = await prisma.budget.update({
           where: { id: existing.id },
-          data: { isActive: true, limit: parseFloat(limit), spent: 0 }
+          data: { isActive: true, limit: parseFloat(limit), spent: initialSpent }
         })
         return res.json({ success: true, data: budget })
       }
@@ -48,7 +62,8 @@ export const createBudget = async (req, res) => {
         userId,
         category,
         limit: parseFloat(limit),
-        period: budgetPeriod
+        period: budgetPeriod,
+        spent: initialSpent
       }
     })
 

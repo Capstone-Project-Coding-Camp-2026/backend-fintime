@@ -1,7 +1,25 @@
-// Transaction & LinkedAccount Controller
-import prisma from '../lib/prisma.js'
+﻿import prisma from '../lib/prisma.js'
 import { classifyWithRules } from '../services/nlpService.js'
 import { TRANSACTION_CATEGORIES } from '../constants/transactionCategories.js'
+
+export const updateBudgetSpent = async (userId, categoryLabel, amountDelta) => {
+  if (amountDelta === 0) return
+  try {
+    const activeBudget = await prisma.budget.findFirst({
+      where: { userId, category: categoryLabel, isActive: true },
+    })
+    if (activeBudget) {
+      const delta = parseFloat(amountDelta)
+      const newSpent = Math.max(0, activeBudget.spent + delta)
+      await prisma.budget.update({
+        where: { id: activeBudget.id },
+        data: { spent: newSpent },
+      })
+    }
+  } catch (err) {
+    console.error('Failed to update budget spent:', err)
+  }
+}
 
 export const getTransactions = async (req, res) => {
   try {
@@ -95,6 +113,11 @@ export const relabelTransaction = async (req, res) => {
       })
     }
 
+    const oldTransaction = await prisma.transaction.findUnique({ where: { id: transactionId } })
+    if (!oldTransaction) {
+      return res.status(404).json({ success: false, message: 'Transaction not found' })
+    }
+
     const transaction = await prisma.transaction.update({
       where: { id: transactionId },
       data: {
@@ -103,6 +126,15 @@ export const relabelTransaction = async (req, res) => {
         confidence: 1.0,
       },
     })
+
+    if (oldTransaction.transactionType === 'debit' && oldTransaction.categoryLabel !== categoryLabel) {
+      if (oldTransaction.categoryLabel && oldTransaction.categoryLabel !== 'unlabelled') {
+        await updateBudgetSpent(oldTransaction.userId, oldTransaction.categoryLabel, -oldTransaction.amount)
+      }
+      if (categoryLabel && categoryLabel !== 'unlabelled') {
+        await updateBudgetSpent(oldTransaction.userId, categoryLabel, oldTransaction.amount)
+      }
+    }
 
     res.json({
       success: true,
@@ -135,6 +167,10 @@ export const relabelBatch = async (req, res) => {
       })
     }
 
+    const oldTransactions = await prisma.transaction.findMany({
+      where: { id: { in: transactionIds } }
+    })
+
     const result = await prisma.transaction.updateMany({
       where: { id: { in: transactionIds } },
       data: {
@@ -143,6 +179,17 @@ export const relabelBatch = async (req, res) => {
         confidence: 1.0,
       },
     })
+
+    for (const oldTx of oldTransactions) {
+      if (oldTx.transactionType === 'debit' && oldTx.categoryLabel !== categoryLabel) {
+        if (oldTx.categoryLabel && oldTx.categoryLabel !== 'unlabelled') {
+          await updateBudgetSpent(oldTx.userId, oldTx.categoryLabel, -oldTx.amount)
+        }
+        if (categoryLabel && categoryLabel !== 'unlabelled') {
+          await updateBudgetSpent(oldTx.userId, categoryLabel, oldTx.amount)
+        }
+      }
+    }
 
     res.json({
       success: true,
@@ -220,6 +267,10 @@ export const createTransaction = async (req, res) => {
         confidence,
       },
     })
+
+    if (transaction.transactionType === 'debit') {
+      await updateBudgetSpent(userIdFromToken, predictedCategory, amount)
+    }
 
     res.status(201).json({
       success: true,
@@ -455,3 +506,4 @@ export const getAccountSummary = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' })
   }
 }
+
