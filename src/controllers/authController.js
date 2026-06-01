@@ -7,7 +7,7 @@ import {
   generateResetToken,
   verifyResetToken,
 } from "../services/emailService.js";
-import { runAsyncMockBuilder } from "./mockController.js";
+import { runAsyncMockBuilder, otpStore } from "./mockController.js";
 
 function mapOccupationToJobType(occupation) {
   if (!occupation) return "permanent";
@@ -532,9 +532,16 @@ export async function verifyOtp(req, res, next) {
       });
     }
 
-    // Mock: OTP "000000" selalu valid untuk testing, atau OTP 6 digit apapun diterima
-    // Untuk production: validasi OTP dari storage (Redis/DB)
-    const isValidOtp = otp === "000000" || /^\d{6}$/.test(otp);
+    // Validasi OTP dari Memory Store (atau mock fallback 000000)
+    const store = otpStore.get(email.toLowerCase());
+    let isValidOtp = false;
+
+    if (store && store.otp === otp && store.expiresAt > Date.now()) {
+      isValidOtp = true;
+      otpStore.delete(email.toLowerCase()); // hapus setelah dipakai agar tidak bisa di-reuse
+    } else if (otp === "000000") {
+      isValidOtp = true; // Fallback / Backdoor untuk keperluan Testing Apple Review / Demo
+    }
 
     if (!isValidOtp) {
       return res.status(400).json({

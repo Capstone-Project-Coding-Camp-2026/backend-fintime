@@ -3,9 +3,12 @@ import { createMockTransactions } from '../config/utils/mockGenerator.js'
 import { calculateMonthlyAggregation } from '../services/aggregationService.js'
 import { classifyTransactionAI } from '../services/aiApiService.js'
 import { generateForecast } from '../services/forecastService.js'
+import { sendOtpEmail } from '../services/emailService.js'
 import prisma from '../lib/prisma.js'
 
-export const simulateOtp = (req, res, next) => {
+export const otpStore = new Map()
+
+export const simulateOtp = async (req, res, next) => {
   try {
     const { email } = req.body
 
@@ -16,9 +19,21 @@ export const simulateOtp = (req, res, next) => {
       })
     }
 
+    // Generate 6 digit OTP acak
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString()
+
+    // Simpan di memory (berlaku 10 menit)
+    otpStore.set(email.toLowerCase(), {
+      otp: otpCode,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+    })
+
+    // Kirim email sungguhan
+    await sendOtpEmail(email, otpCode)
+
     res.status(200).json({
       status: 'success',
-      message: `OTP berhasil dikirim ke ${email} (Simulated)`,
+      message: `OTP berhasil dikirim ke ${email}`,
     })
   } catch (error) {
     next(error)

@@ -151,4 +151,86 @@ FinTime AI - 2026
   }
 }
 
-export default { sendResetPasswordEmail, generateResetToken, verifyResetToken }
+export async function sendOtpEmail(email, otpCode) {
+  const transporter = await getTransporter()
+
+  const mailOptions = {
+    from: `"FinTime" <${process.env.SMTP_USER}>`,
+    to: email,
+    subject: '🔐 Kode OTP Registrasi - FinTime',
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; background: #020b18; color: #e0f7ff; margin: 0; padding: 20px; }
+          .container { max-width: 500px; margin: 0 auto; background: linear-gradient(135deg, #061528, #0a1f35); border-radius: 16px; border: 1px solid rgba(0,245,255,0.2); overflow: hidden; }
+          .header { background: linear-gradient(135deg, #00f5ff, #0096c7); padding: 30px; text-align: center; }
+          .header h1 { color: #020b18; margin: 0; font-size: 28px; }
+          .content { padding: 40px 30px; text-align: center; }
+          .content p { color: #7bafc4; line-height: 1.8; margin-bottom: 20px; font-size: 16px; }
+          .otp-box { background: rgba(0,245,255,0.1); border: 2px dashed rgba(0,245,255,0.5); border-radius: 12px; padding: 20px; margin: 20px auto; max-width: 250px; }
+          .otp-code { font-family: monospace; font-size: 32px; font-weight: bold; color: #00f5ff; letter-spacing: 8px; }
+          .warning { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.3); border-radius: 12px; padding: 15px; color: #f87171; font-size: 14px; margin-top: 20px; }
+          .footer { padding: 20px 30px; text-align: center; color: #4a7fa0; font-size: 12px; border-top: 1px solid rgba(0,245,255,0.1); }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>⏱ FinTime</h1>
+          </div>
+          <div class="content">
+            <h2 style="color: #00f5ff; margin-top: 0;">Kode Verifikasi (OTP)</h2>
+            <p>Terima kasih telah mendaftar di FinTime. Berikut adalah kode OTP Anda untuk menyelesaikan pendaftaran:</p>
+
+            <div class="otp-box">
+              <div class="otp-code">${otpCode}</div>
+            </div>
+
+            <p>Masukkan kode ini di halaman pendaftaran.</p>
+
+            <div class="warning">
+              ⚠️ Kode ini hanya berlaku selama <strong>10 menit</strong>. Jangan berikan kode ini kepada siapapun!
+            </div>
+          </div>
+          <div class="footer">
+            <p>Email ini dikirim otomatis oleh sistem FinTime AI</p>
+            <p>&copy; 2026 FinTime - AI Powering Future</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `
+FinTime - Kode OTP
+
+Berikut adalah kode OTP Anda:
+${otpCode}
+
+Kode ini hanya berlaku selama 10 menit. Jangan berikan kepada siapapun.
+
+---
+FinTime AI - 2026
+    `.trim(),
+  }
+
+  try {
+    const info = await transporter.sendMail(mailOptions)
+
+    console.log('\n📧 [EMAIL SERVICE] OTP Email Sent!')
+    console.log('   To:', email)
+    console.log('   OTP Code:', otpCode)
+
+    return {
+      success: true,
+      message: 'Email OTP telah dikirim. Silakan cek inbox Anda.',
+    }
+  } catch (error) {
+    console.error('[EMAIL SERVICE] Failed to send OTP email:', error)
+    throw new Error('Gagal mengirim email OTP')
+  }
+}
+
+export default { sendResetPasswordEmail, generateResetToken, verifyResetToken, sendOtpEmail }
