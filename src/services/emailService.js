@@ -36,45 +36,35 @@ async function getTransporter() {
 }
 
 async function sendMail(mailOptions) {
-  try {
-    // 1. Coba pakai REST API (jika token ada)
-    if (process.env.MAILERSEND_TOKEN && process.env.SMTP_USER) {
-      console.log('\n📧 [EMAIL SERVICE] Using MailerSend REST API (Bypassing SMTP)')
-      const response = await fetch('https://api.mailersend.com/v1/email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.MAILERSEND_TOKEN}`
-        },
-        body: JSON.stringify({
-          from: { email: process.env.SMTP_USER, name: "FinTime" },
-          to: [{ email: mailOptions.to }],
-          subject: mailOptions.subject,
-          text: mailOptions.text,
-          html: mailOptions.html
-        })
-      });
+  // 1. Coba pakai REST API (jika token ada)
+  if (process.env.MAILERSEND_TOKEN && process.env.SMTP_USER) {
+    console.log('\n📧 [EMAIL SERVICE] Using MailerSend REST API (Bypassing SMTP)')
+    const response = await fetch('https://api.mailersend.com/v1/email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.MAILERSEND_TOKEN}`
+      },
+      body: JSON.stringify({
+        from: { email: process.env.SMTP_USER, name: "FinTime" },
+        to: [{ email: mailOptions.to }],
+        subject: mailOptions.subject,
+        text: mailOptions.text,
+        html: mailOptions.html
+      })
+    });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[EMAIL SERVICE] MailerSend API Error:', errorText);
-        throw new Error('MailerSend API Error: ' + errorText);
-      }
-      return { success: true };
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[EMAIL SERVICE] MailerSend API Error:', errorText);
+      throw new Error('MailerSend API Error: ' + errorText);
     }
-    
-    // 2. Fallback ke SMTP
-    const transporter = await getTransporter()
-    return await transporter.sendMail(mailOptions)
-  } catch (error) {
-    console.error('\n⚠️ [EMAIL SERVICE] PENGIRIMAN GAGAL TAPI DIABAIKAN KARENA MODE PRODUKSI/TESTING.');
-    console.error('Error Detail:', error.message);
-    console.error('👉 Gunakan OTP Backdoor "000000" untuk melanjutkan pendaftaran.');
-    
-    // Kembalikan success true agar frontend tidak error 500
-    // dan user tetap bisa lanjut pendaftaran menggunakan backdoor
-    return { success: true, bypassed: true };
+    return { success: true };
   }
+  
+  // 2. Fallback ke SMTP
+  const transporter = await getTransporter()
+  return await transporter.sendMail(mailOptions)
 }
 
 export function generateResetToken(email) {
