@@ -171,7 +171,7 @@ model Learning {
   content         String
   targetCondition String               // good / normal / bad / all
   category        String               // investasi / budgeting / utang / tabungan / pensiun
-
+  sourceUrl       String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

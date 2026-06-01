@@ -15,5 +15,5 @@ router.get('/transactions', generateMockTransactions);
 router.post('/import-transactions', authMiddleware, importTransactions);
 
 // POST /api/transactions/sync 
-// Sync dari Mock API + NLP + cek label_rules → aggregation → forecast → avatar
+// Sync dari Mock API + NLP + cek label_rules, aggregation, forecast, avatar
 export default router;

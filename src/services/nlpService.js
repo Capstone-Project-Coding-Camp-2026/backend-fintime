@@ -96,7 +96,6 @@ function keywordMatch(description) {
 }
 
 // Fungsi utama: classifyDescription
-// Menjalankan Layer 1 → Layer 2 → Layer 3
 
 /**
  * Klasifikasi deskripsi transaksi
@@ -189,7 +188,7 @@ export function applyLabelRules(description, labelRules) {
 /**
  * Proses utama klasifikasi
  * 1. Cek label_rules user
- * 2. Jika tidak cocok → NLP (Layer 1 → 2 → 3)
+ * 2. Jika tidak cocok maka jalankan NLP (Layer 1, 2, 3)
  * @param {string} description
  * @param {Array} labelRules - label_rules milik user
  */
@@ -200,7 +199,7 @@ export async function classifyWithRules(description, labelRules = []) {
     return ruleResult
   }
 
-  // Step 2: Jalankan NLP (Layer 1 → 2 → 3)
+  // Step 2: Jalankan NLP (Layer 1, 2, 3)
   return await classifyDescription(description)
 }
 

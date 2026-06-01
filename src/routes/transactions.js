@@ -309,7 +309,7 @@ router.put('/relabel-batch', authMiddleware, async (req, res) => {
   }
 })
 // POST /api/transactions/sync
-// Sync dari Mock API + NLP + cek label_rules â†’ aggregation â†’ forecast â†’ avatar
+// Sync dari Mock API + NLP + cek label_rules, aggregation, forecast, avatar
 router.post('/sync', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.sub
@@ -321,11 +321,11 @@ router.post('/sync', authMiddleware, async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' })
     }
     // Jalankan full pipeline di background (non-blocking):
-    // Mock API â†’ cek label_rules â†’ NLP â†’ aggregation â†’ forecast â†’ avatar
+    // Mock API + cek label_rules, lalu NLP, aggregation, forecast, avatar
     runAsyncMockBuilder(userId, user.monthlyIncome, user.jobType, user.linkedAccounts)
     res.json({
       success: true,
-      message: 'Sync started. Transaksi sedang diproses di background (NLP â†’ aggregation â†’ forecast â†’ avatar).',
+      message: 'Sync started. Transaksi sedang diproses di background (NLP + aggregation + forecast + avatar).',
       status: 'processing',
     })
   } catch (error) {
