@@ -21,15 +21,25 @@ export const createBudget = async (req, res) => {
     const userId = req.params.userId
     const { category, limit, period } = req.body
 
+    const budgetPeriod = period || 'monthly'
+
     // Check if budget already exists
     const existing = await prisma.budget.findFirst({
-      where: { userId, category, period }
+      where: { userId, category, period: budgetPeriod }
     })
 
     if (existing) {
+      // If it exists but is inactive, we can reactivate it and update limit
+      if (!existing.isActive) {
+        const budget = await prisma.budget.update({
+          where: { id: existing.id },
+          data: { isActive: true, limit: parseFloat(limit), spent: 0 }
+        })
+        return res.json({ success: true, data: budget })
+      }
       return res.status(400).json({
         success: false,
-        message: 'Budget untuk kategori ini sudah ada'
+        message: 'Budget untuk kategori ini pada periode ini sudah ada'
       })
     }
 
@@ -38,13 +48,16 @@ export const createBudget = async (req, res) => {
         userId,
         category,
         limit: parseFloat(limit),
-        period: period || 'monthly'
+        period: budgetPeriod
       }
     })
 
     res.json({ success: true, data: budget })
   } catch (error) {
     console.error('Create budget error:', error)
+    if (error.code === 'P2002') {
+      return res.status(400).json({ success: false, message: 'Budget untuk kategori ini pada periode ini sudah ada' })
+    }
     res.status(500).json({ success: false, message: 'Failed to create budget' })
   }
 }
@@ -231,6 +244,15 @@ export const createGoal = async (req, res) => {
     const userId = req.params.userId
     const { name, category, targetAmount, currentAmount, targetDate, description } = req.body
 
+    let parsedTargetDate = null
+    if (targetDate) {
+      parsedTargetDate = new Date(targetDate)
+      // Validate date and year range (prevent 20277)
+      if (isNaN(parsedTargetDate.getTime()) || parsedTargetDate.getFullYear() > 2100 || parsedTargetDate.getFullYear() < 2000) {
+        return res.status(400).json({ success: false, message: 'Format tanggal tidak valid' })
+      }
+    }
+
     const goal = await prisma.goal.create({
       data: {
         userId,
@@ -238,7 +260,7 @@ export const createGoal = async (req, res) => {
         category,
         targetAmount: parseFloat(targetAmount),
         currentAmount: parseFloat(currentAmount) || 0,
-        targetDate: targetDate ? new Date(targetDate) : null,
+        targetDate: parsedTargetDate,
         description,
         isCompleted: currentAmount >= targetAmount,
         completedAt: currentAmount >= targetAmount ? new Date() : null

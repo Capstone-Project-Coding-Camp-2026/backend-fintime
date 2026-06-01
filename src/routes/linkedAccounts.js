@@ -110,6 +110,24 @@ router.post('/', authMiddleware, async (req, res) => {
       }
     });
 
+    // Create initial balance transaction if balance > 0
+    if (balance > 0) {
+      await prisma.transaction.create({
+        data: {
+          userId,
+          amount: balance,
+          description: `SALDO AWAL - ${name.toUpperCase()}`,
+          categoryLabel: 'lainnya',
+          transactionType: 'credit',
+          paymentMethod: type === 'bank' ? 'transfer' : 'ewallet',
+          source: provider,
+          dateTime: new Date(),
+          isLabelled: true,
+          confidence: 1.0
+        }
+      });
+    }
+
     res.status(201).json({
       success: true,
       message: 'Account linked successfully',
