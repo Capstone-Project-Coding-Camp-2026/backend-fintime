@@ -35,6 +35,40 @@ async function getTransporter() {
   }
 }
 
+async function sendMail(mailOptions) {
+  if (process.env.MAILERSEND_TOKEN && process.env.SMTP_USER) {
+    console.log('\n📧 [EMAIL SERVICE] Using MailerSend REST API (Bypassing SMTP)')
+    const response = await fetch('https://api.mailersend.com/v1/email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.MAILERSEND_TOKEN}`
+      },
+      body: JSON.stringify({
+        from: {
+          email: process.env.SMTP_USER,
+          name: "FinTime"
+        },
+        to: [
+          { email: mailOptions.to }
+        ],
+        subject: mailOptions.subject,
+        text: mailOptions.text,
+        html: mailOptions.html
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[EMAIL SERVICE] MailerSend API Error:', errorText);
+      throw new Error('MailerSend API Error: ' + errorText);
+    }
+    return { success: true };
+  }
+  
+  const transporter = await getTransporter()
+  return transporter.sendMail(mailOptions)
+}
 
 export function generateResetToken(email) {
   return jwt.sign(
@@ -59,8 +93,6 @@ export function verifyResetToken(token) {
 
 
 export async function sendResetPasswordEmail(email, resetToken) {
-  const transporter = await getTransporter()
-
   // Base URL berdasarkan environment
   const baseUrl = process.env.CLIENT_URL || 'http://localhost:5173'
   const resetLink = `${baseUrl}/reset-password?token=${resetToken}`
@@ -134,7 +166,7 @@ FinTime AI - 2026
   }
 
   try {
-    const info = await transporter.sendMail(mailOptions)
+    await sendMail(mailOptions)
 
     console.log('\n📧 [EMAIL SERVICE] Reset Email Sent!')
     console.log('   To:', email)
@@ -152,7 +184,6 @@ FinTime AI - 2026
 }
 
 export async function sendOtpEmail(email, otpCode) {
-  const transporter = await getTransporter()
 
   const mailOptions = {
     from: `"FinTime" <${process.env.SMTP_USER}>`,
@@ -217,7 +248,7 @@ FinTime AI - 2026
   }
 
   try {
-    const info = await transporter.sendMail(mailOptions)
+    await sendMail(mailOptions)
 
     console.log('\n📧 [EMAIL SERVICE] OTP Email Sent!')
     console.log('   To:', email)
