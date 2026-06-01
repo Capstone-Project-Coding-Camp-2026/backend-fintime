@@ -80,12 +80,30 @@ export async function register(req, res, next) {
       monthlyIncome,
       linkedAccounts,
       retirementAge,
+      otp, // Tambahkan parameter OTP
     } = req.body;
 
     // validation
-    if (!fullName || !email || !password) {
+    if (!fullName || !email || !password || !otp) {
       return res.status(400).json({
-        message: "Missing required fields",
+        message: "Missing required fields (including OTP)",
+      });
+    }
+
+    // Validasi OTP
+    const store = otpStore.get(email.toLowerCase());
+    let isValidOtp = false;
+
+    if (store && store.otp === otp && store.expiresAt > Date.now()) {
+      isValidOtp = true;
+      otpStore.delete(email.toLowerCase()); // hapus setelah dipakai
+    } else if (otp === "000000") {
+      isValidOtp = true; // Fallback / Backdoor untuk Testing Apple Review / Demo
+    }
+
+    if (!isValidOtp) {
+      return res.status(400).json({
+        message: "OTP tidak valid atau sudah kedaluwarsa",
       });
     }
 
