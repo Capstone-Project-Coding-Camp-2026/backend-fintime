@@ -9,7 +9,7 @@
   "main": "src/server.js",
   "scripts": {
     "build": "npx prisma generate",
-    "start": "node src/server.js",
+    "start": "npx prisma generate && npx prisma db push --accept-data-loss && node prisma/seed.js && node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },

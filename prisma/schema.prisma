@@ -168,12 +168,14 @@ predictedExpenseTrend Json @default("[]")
 model Learning {
   id              String   @id @default(cuid())
   title           String
+  titleEn         String?
   content         String
+  contentEn       String?
   targetCondition String               // good / normal / bad / all
   category        String               // investasi / budgeting / utang / tabungan / pensiun
   sourceUrl       String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 // ============================================================
