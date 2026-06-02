@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer'
+﻿import nodemailer from 'nodemailer'
 import jwt from 'jsonwebtoken'
 
 let testAccount = null
@@ -36,7 +36,6 @@ async function getTransporter() {
 }
 
 async function sendMail(mailOptions) {
-  // 1. Coba pakai REST API (jika token ada)
   if (process.env.MAILERSEND_TOKEN && process.env.SMTP_USER) {
     console.log('\n📧 [EMAIL SERVICE] Using MailerSend REST API (Bypassing SMTP)')
     const response = await fetch('https://api.mailersend.com/v1/email', {
@@ -46,8 +45,13 @@ async function sendMail(mailOptions) {
         'Authorization': `Bearer ${process.env.MAILERSEND_TOKEN}`
       },
       body: JSON.stringify({
-        from: { email: process.env.SMTP_USER, name: "FinTime" },
-        to: [{ email: mailOptions.to }],
+        from: {
+          email: process.env.SMTP_USER,
+          name: "FinTime"
+        },
+        to: [
+          { email: mailOptions.to }
+        ],
         subject: mailOptions.subject,
         text: mailOptions.text,
         html: mailOptions.html
@@ -62,9 +66,8 @@ async function sendMail(mailOptions) {
     return { success: true };
   }
   
-  // 2. Fallback ke SMTP
   const transporter = await getTransporter()
-  return await transporter.sendMail(mailOptions)
+  return transporter.sendMail(mailOptions)
 }
 
 export function generateResetToken(email) {
