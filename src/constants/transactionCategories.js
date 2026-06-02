@@ -1,9 +1,5 @@
 
-/**
- * kategori diperluas menjadi 18 kategori agar sinkron dengan Frontend
- */
 export const TRANSACTION_CATEGORIES = [
-  // --- KATEGORI PENGELUARAN (Dianggap Expense) ---
   'perumahan',
   'makanan',
   'transport',
@@ -17,23 +13,17 @@ export const TRANSACTION_CATEGORIES = [
   'tidak_diketahui',
   'transfer_keluarga',
   'transfer_sosial',
-
-  // --- KATEGORI PEMASUKAN (Credit) ---
   'gaji',
   'freelance',
   'hadiah',
-
-  // --- KATEGORI NON-EXPENSE (Pengecualian) ---
   'topup_ewallet',
   'transfer_internal',
 ]
 
-// Kategori yang TIDAK dihitung sebagai expense
 export const NON_EXPENSE_CATEGORIES = ['topup_ewallet', 'transfer_internal']
 
 
 export const CATEGORY_MAPPING = {
-  // Mapping dari format Category_N (output model lama)
   Category_0: 'makanan',
   Category_1: 'transport',
   Category_2: 'hiburan',
@@ -47,7 +37,6 @@ export const CATEGORY_MAPPING = {
   Category_10: 'tidak_diketahui',
   Category_11: 'topup_ewallet',
   Category_12: 'transfer_internal',
-  // Alias yang mungkin dikirim AI
   food: 'makanan',
   transportation: 'transport',
   entertainment: 'hiburan',

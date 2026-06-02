@@ -22,7 +22,6 @@ export const mapCategory = (predictedCategory) => {
     return CATEGORY_MAPPING[cleanCategory];
   }
 
-  // coba langsung jika sudah dalam format yang valid
   if (TRANSACTION_CATEGORIES.includes(cleanCategory)) {
     return cleanCategory;
   }

@@ -21,7 +21,7 @@ export const buildWhatIfPayload = ({
   } = profile;
 
   // Calculate age safely
-  let userAge = 25 // default
+  let userAge = 25
   if (user.birthDate) {
     const birth = new Date(user.birthDate)
     const today = new Date()

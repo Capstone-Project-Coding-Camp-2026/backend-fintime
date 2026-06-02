@@ -1,4 +1,4 @@
-﻿import express from 'express'
+import express from 'express'
 import { authMiddleware } from '../middleware/auth.js'
 import prisma from '../lib/prisma.js'
 import { createTransaction, updateBudgetSpent } from '../controllers/transactionController.js'
@@ -37,7 +37,11 @@ router.get('/:userId', authMiddleware, async (req, res) => {
     if (startDate || endDate) {
       where.dateTime = {}
       if (startDate) where.dateTime.gte = new Date(startDate)
-      if (endDate) where.dateTime.lte = new Date(endDate)
+      if (endDate) {
+        const end = new Date(endDate)
+        end.setUTCHours(23, 59, 59, 999)
+        where.dateTime.lte = end
+      }
     }
     if (category) where.categoryLabel = category
     if (type) where.transactionType = type

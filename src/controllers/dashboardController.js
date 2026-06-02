@@ -1,25 +1,15 @@
-/**
- * GET /api/dashboard/:userId — data ringkasan dashboard komprehensif
- * Menggabungkan:
- * - Profil user
- * - Avatar state (kondisi good/normal/bad + prediksi)
- * - Aggregasi bulan ini
- * - Ringkasan rekening tertaut
- * - Statistik transaksi (pending re-label)
- * - Trend 6 bulan terakhir
- */
+
 import prisma from '../lib/prisma.js'
 
 export async function getDashboard(req, res, next) {
   try {
     const { userId } = req.params
 
-    // Auth guard — user hanya bisa akses dashboard sendiri
     if (req.user.sub !== userId) {
       return res.status(403).json({ success: false, message: 'Forbidden' })
     }
 
-    // Ambil semua data secara paralel
+
     const now = new Date()
     const currentYear = now.getFullYear()
     const currentMonth = now.getMonth() + 1

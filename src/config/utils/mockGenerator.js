@@ -1,4 +1,3 @@
-// Menerima data dari form pendaftaran pengguna!
 export const createMockTransactions = (
   jobType = 'permanent',
   statedIncome = 5000000,
@@ -14,10 +13,7 @@ export const createMockTransactions = (
   } else {
     startDate.setDate(endDate.getDate() - 1)
   }
-  // ==========================================
-  // DYNAMIC ACCOUNT GENERATOR
-  // ==========================================
-  // Pisahkan bank dan e-wallet yang dikirim dari form pendaftaran
+  
   const userBanks = linkedAccounts
     .filter((acc) => acc.type === 'bank')
     .map((acc) => acc.provider.toLowerCase())
@@ -46,21 +42,18 @@ export const createMockTransactions = (
       ? userEwallets[0]
       : fallbackEwallets[Math.floor(Math.random() * fallbackEwallets.length)]
 
-  // ==========================================
-  // GAYA HIDUP
-  // ==========================================
+
   let myFoodHabit = 0.3
   let isShopaholic = false
 
   // Penyesuaian Perilaku Berdasarkan Pekerjaan
   if (jobType === 'not_working' || jobType === 'student' || jobType === 'Mahasiswa') {
-    myFoodHabit = 0.6 // Mahasiswa lebih sering jajan murah/kopi
-    isShopaholic = false // Jarang belanja mahal
+    myFoodHabit = 0.6 
+    isShopaholic = false 
   } else if (jobType === 'freelance' || jobType === 'gig') {
-    myFoodHabit = 0.5 // Sering kerja di cafe
+    myFoodHabit = 0.5 
     isShopaholic = true
   } else {
-    // Pekerja kantoran
     myFoodHabit = 0.4
     isShopaholic = Math.random() > 0.5
   }
@@ -72,11 +65,8 @@ export const createMockTransactions = (
     const month = currentMonth.getMonth()
     const daysInMonth = new Date(year, month + 1, 0).getDate()
 
-    // ==========================================
-    // PENDAPATAN
-    // ==========================================
+ 
     if (jobType === 'not_working' || jobType === 'student' || jobType === 'Mahasiswa') {
-      // MAHASISWA
       generatedTransactions.push({
         dateTime: new Date(year, month, 3, 10, 0, 0).toISOString(),
         description: 'TRANSFER DARI ORANG TUA / BEASISWA',
@@ -84,7 +74,7 @@ export const createMockTransactions = (
         categoryLabel: null,
         transactionType: 'credit',
         paymentMethod: 'tunai',
-        source: primaryBank, // Uang masuk ke Bank Utama
+        source: primaryBank, 
       })
     } else if (jobType === 'freelance' || jobType === 'gig') {
       // FREELANCER
@@ -100,7 +90,7 @@ export const createMockTransactions = (
           categoryLabel: null,
           transactionType: 'credit',
           paymentMethod: 'tunai',
-          source: primaryBank, // Uang masuk ke Bank Utama
+          source: primaryBank, 
         })
       }
     } else {
@@ -112,17 +102,13 @@ export const createMockTransactions = (
         categoryLabel: null,
         transactionType: 'credit',
         paymentMethod: 'tunai',
-        source: primaryBank, // Uang masuk ke Bank Utama
+        source: primaryBank, 
       })
     }
 
-    // ==========================================
-    // DISTRIBUSI KEUANGAN
-    // ==========================================
-    // Transfer dana dari Bank Utama ke Bank Sekunder untuk bayar Kos/Listrik
     const operationalFund = 2000000
 
-    // Uang Keluar dari Bank Utama
+  
     generatedTransactions.push({
       dateTime: new Date(year, month, 1, 8, 0, 0).toISOString(),
       description: `TRANSFER KE ${secondaryBank.toUpperCase()} (KEBUTUHAN BULANAN)`,
@@ -165,9 +151,6 @@ export const createMockTransactions = (
       source: secondaryBank,
     })
 
-    // ==========================================
-    // PENGELUARAN HARIAN & WEEKEND
-    // ==========================================
     for (let day = 1; day <= daysInMonth; day++) {
       const isWeekend = new Date(year, month, day).getDay() % 6 === 0
 

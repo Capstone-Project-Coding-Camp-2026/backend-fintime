@@ -1,4 +1,4 @@
-﻿import prisma from '../lib/prisma.js'
+import prisma from '../lib/prisma.js'
 import { classifyWithRules } from '../services/nlpService.js'
 import { TRANSACTION_CATEGORIES } from '../constants/transactionCategories.js'
 
@@ -37,7 +37,11 @@ export const getTransactions = async (req, res) => {
     if (startDate || endDate) {
       where.dateTime = {}
       if (startDate) where.dateTime.gte = new Date(startDate)
-      if (endDate) where.dateTime.lte = new Date(endDate)
+      if (endDate) {
+        const end = new Date(endDate)
+        end.setUTCHours(23, 59, 59, 999)
+        where.dateTime.lte = end
+      }
     }
 
     if (category) where.categoryLabel = category

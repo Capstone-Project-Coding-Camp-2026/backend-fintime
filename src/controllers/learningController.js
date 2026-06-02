@@ -1,7 +1,3 @@
-/**
- * Konten edukasi keuangan
- * GET /api/learning/recommendations
- */
 import prisma from '../lib/prisma.js'
 
 export async function getLearningRecommendations(req, res, next) {
