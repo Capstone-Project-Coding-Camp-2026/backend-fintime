@@ -14,11 +14,22 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js'
 
 export function createApp() {
   const app = express()
-  const origin = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
+  const originEnv = process.env.CLIENT_ORIGIN || 'http://localhost:5173,https://fintime.up.railway.app'
+  
+  // Split multiple origins if separated by comma
+  const allowedOrigins = originEnv.split(',').map(o => o.trim())
 
   app.use(
     cors({
-      origin,
+      origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true)
+        if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
+          callback(null, true)
+        } else {
+          callback(new Error('Not allowed by CORS'))
+        }
+      },
       credentials: true,
     })
   )
